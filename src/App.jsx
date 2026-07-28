@@ -526,6 +526,12 @@ export default function App() {
           }}>Publisher Dashboard</li>
           <li className="nav-link" onClick={() => setCurrentPage('legal-terms')}>Terms</li>
           <li className="nav-link" onClick={() => setCurrentPage('legal-privacy')}>Privacy</li>
+          <li className="nav-link" onClick={() => setCurrentPage('donate')} style={{ color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}>
+            <DollarSign size={14} /> Donate
+          </li>
+          <li className="nav-link" onClick={() => setCurrentPage('owner')} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <Lock size={14} /> Admin
+          </li>
           {user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
               <span style={{ fontSize: '13px', color: '#9ca3af' }}>{user.email}</span>
@@ -1541,6 +1547,63 @@ export default function App() {
               <p>EarnVictor respects copyright laws and operates in full compliance with the Digital Millennium Copyright Act. We mandate that all connected apps, websites, and APKs monetizing through our network represent original or fully-licensed intellectual property.</p>
               <h3>Filing a Copyright Takedown</h3>
               <p>If you identify properties running ads on our network that infringe on your copyright, submit a formal claim including the property URL, proof of ownership, and signature to our support mail. We execute review checks within 48 hours.</p>
+            </div>
+          </div>
+        )}
+
+        {/* PAGE: DONATE SECTION */}
+        {currentPage === 'donate' && (
+          <div style={{ display: 'flex', justifyContent: 'center', margin: '40px 0' }}>
+            <div className="glass-panel" style={{ padding: '40px', maxWidth: '500px', width: '100%', textAlign: 'center', border: '1px solid rgba(251, 191, 36, 0.3)' }}>
+              <div style={{ background: 'rgba(251, 191, 36, 0.1)', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                <DollarSign size={32} color="#fbbf24" />
+              </div>
+              <h2 style={{ fontSize: '28px', marginBottom: '12px' }}>Support EarnVictor</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: 1.6, marginBottom: '24px' }}>
+                We are building a clean, transparent, and secure ad network with the lowest platform commissions. Support our hosting and developer costs to help us keep payouts high for everyone!
+              </p>
+
+              <div className="glass-card" style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '24px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '24px' }}>
+                <span style={{ fontSize: '12px', color: '#fbbf24', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>Direct UPI Donation</span>
+                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#fff', margin: '12px 0 6px', wordBreak: 'break-all' }}>
+                  arasu9629hf@okhdfcbank
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  Minimum: ₹50 | Maximum: Unlimited
+                </div>
+                
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  style={{ marginTop: '16px', width: '100%', fontSize: '13px' }}
+                  onClick={() => {
+                    navigator.clipboard.writeText("arasu9629hf@okhdfcbank");
+                    alert("UPI ID copied to clipboard!");
+                  }}
+                >
+                  Copy UPI ID
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left', background: 'rgba(255,255,255,0.01)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'start', fontSize: '13px' }}>
+                  <CheckCircle size={16} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <span>Your support directly funds verification API servers and server hosting costs.</span>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'start', fontSize: '13px' }}>
+                  <CheckCircle size={16} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <span>Allows us to lower the owner commission rate even further!</span>
+                </div>
+              </div>
+
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                style={{ width: '100%', marginTop: '24px' }} 
+                onClick={() => setCurrentPage('home')}
+              >
+                Return to Home
+              </button>
             </div>
           </div>
         )}
