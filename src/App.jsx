@@ -630,6 +630,31 @@ export default function App() {
     }
   };
 
+  const [editUsdBalances, setEditUsdBalances] = useState({});
+  const [editInrBalances, setEditInrBalances] = useState({});
+
+  const handleUpdatePublisherBalance = async (pubId) => {
+    const usdVal = editUsdBalances[pubId];
+    const inrVal = editInrBalances[pubId];
+    if (usdVal === undefined && inrVal === undefined) {
+      alert("Please change either the USD or INR balance first.");
+      return;
+    }
+
+    try {
+      const updates = {};
+      if (usdVal !== undefined) updates.balance_usd = parseFloat(usdVal);
+      if (inrVal !== undefined) updates.balance_inr = parseFloat(inrVal);
+
+      const { error } = await supabase.table('profiles').update(updates).eq('id', pubId);
+      if (error) throw error;
+      setOwnerMsg({ type: 'success', text: 'Publisher balance updated successfully!' });
+      fetchOwnerData();
+    } catch (err) {
+      setOwnerMsg({ type: 'error', text: err.message });
+    }
+  };
+
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
     setCopiedToken(true);
@@ -1787,6 +1812,108 @@ export default function App() {
 
             </div>
 
+            {/* 3. Publisher Balance Customizer (Free Customize & Edit) */}
+            <div className="glass-panel" style={{ padding: '24px', marginTop: '30px' }}>
+              <h3 style={{ marginBottom: '20px' }}>Publisher Accounts Balance Manager (Customise & Free Config)</h3>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#9ca3af' }}>
+                      <th style={{ padding: '12px' }}>Publisher Email</th>
+                      <th style={{ padding: '12px' }}>Role</th>
+                      <th style={{ padding: '12px' }}>USD Balance ($)</th>
+                      <th style={{ padding: '12px' }}>INR Balance (₹)</th>
+                      <th style={{ padding: '12px' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allProfiles.map(prof => (
+                      <tr key={prof.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', verticalAlign: 'middle' }}>
+                        <td style={{ padding: '12px', fontWeight: 'bold' }}>{prof.email}</td>
+                        <td style={{ padding: '12px' }}>
+                          <span className={`badge ${prof.role === 'owner' ? 'badge-verified' : 'badge-pending'}`} style={{ textTransform: 'uppercase' }}>
+                            {prof.role}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px' }}>
+                          <input 
+                            type="number" 
+                            step="0.0001" 
+                            className="form-control" 
+                            style={{ width: '120px', padding: '6px 10px', fontSize: '13px' }}
+                            defaultValue={parseFloat(prof.balance_usd).toFixed(4)} 
+                            onChange={e => setEditUsdBalances({ ...editUsdBalances, [prof.id]: e.target.value })}
+                          />
+                        </td>
+                        <td style={{ padding: '12px' }}>
+                          <input 
+                            type="number" 
+                            step="0.01" 
+                            className="form-control" 
+                            style={{ width: '120px', padding: '6px 10px', fontSize: '13px' }}
+                            defaultValue={parseFloat(prof.balance_inr).toFixed(2)} 
+                            onChange={e => setEditInrBalances({ ...editInrBalances, [prof.id]: e.target.value })}
+                          />
+                        </td>
+                        <td style={{ padding: '12px' }}>
+                          <button 
+                            className="btn btn-emerald" 
+                            style={{ padding: '6px 14px', fontSize: '12px' }}
+                            onClick={() => handleUpdatePublisherBalance(prof.id)}
+                          >
+                            Update Payout Balance
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 4. Detailed Traffic Analysis Breakdown */}
+            <div className="glass-panel" style={{ padding: '24px', marginTop: '30px' }}>
+              <h3 style={{ marginBottom: '20px' }}>Global Traffic Analysis & Property Performance</h3>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#9ca3af' }}>
+                      <th style={{ padding: '12px' }}>Registered Domain URL</th>
+                      <th style={{ padding: '12px' }}>Property Type</th>
+                      <th style={{ padding: '12px' }}>Status</th>
+                      <th style={{ padding: '12px' }}>Publisher Owner</th>
+                      <th style={{ padding: '12px' }}>Monetization Health</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allProperties.map(prop => (
+                      <tr key={prop.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <td style={{ padding: '12px', fontWeight: 'bold' }}>{prop.url}</td>
+                        <td style={{ padding: '12px', textTransform: 'uppercase' }}>{prop.type}</td>
+                        <td style={{ padding: '12px' }}>
+                          <span className={`badge badge-${prop.status}`}>
+                            {prop.status}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px', color: '#9ca3af' }}>{prop.profiles?.email || 'Unknown'}</td>
+                        <td style={{ padding: '12px' }}>
+                          {prop.status === 'verified' ? (
+                            <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <CheckCircle size={14} /> Active & High Yielding
+                            </span>
+                          ) : (
+                            <span style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <XCircle size={14} /> Restricted / Blocked
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
           </div>
         )}
 
@@ -1854,7 +1981,6 @@ export default function App() {
           </div>
           <div style={{ display: 'flex', gap: '20px' }}>
             <span style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => setCurrentPage('legal-dmca')}>DMCA Certificate</span>
-            <span style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => setCurrentPage('owner')}>Owner Panel</span>
           </div>
         </div>
       </footer>
