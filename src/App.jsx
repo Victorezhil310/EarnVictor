@@ -28,12 +28,21 @@ import {
   RefreshCw,
   LogOut,
   Copy,
-  Info
+  Info,
+  Play,
+  Search,
+  MessageCircle,
+  Award,
+  Link,
+  ChevronDown
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState('home'); // home, auth, dashboard, owner, owner-dashboard, legal-terms, legal-privacy, legal-dmca
+  const [activeTab, setActiveTab] = useState('statistics'); // statistics, websites, telegram_apps, direct_link, payments, insights, referral, priority, help_center, donate
+  
+  // User Auth State
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [authEmail, setAuthEmail] = useState('');
@@ -42,7 +51,7 @@ export default function App() {
   const [authError, setAuthError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Publisher State
+  // Publisher Properties and Zones
   const [properties, setProperties] = useState([]);
   const [newPropName, setNewPropName] = useState('');
   const [newPropUrl, setNewPropUrl] = useState('');
@@ -51,16 +60,32 @@ export default function App() {
   const [zones, setZones] = useState([]);
   const [newZoneName, setNewZoneName] = useState('');
   const [newZoneType, setNewZoneType] = useState('smartlink');
+  const [websiteSearchQuery, setWebsiteSearchQuery] = useState('');
   
-  // Wallet & Withdraw
+  // Direct Link Page
+  const [directLinks, setDirectLinks] = useState([
+    { id: 'dl-1', url: 'https://omg10.com/4/11439317', status: 'active', name: 'Direct Link 1', created_at: '2026-07-28' }
+  ]);
+  const [newDlName, setNewDlName] = useState('');
+
+  // Wallet & Withdrawals
   const [withdrawals, setWithdrawals] = useState([]);
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawCurrency, setWithdrawCurrency] = useState('USD');
-  const [withdrawMethod, setWithdrawMethod] = useState('Bank Transfer');
+  const [withdrawMethod, setWithdrawMethod] = useState('PayPal');
   const [withdrawDetails, setWithdrawDetails] = useState('');
   const [usdToInrRate, setUsdToInrRate] = useState(83.50);
   const [ownerCommissionRate, setOwnerCommissionRate] = useState(0.20);
   const [withdrawMsg, setWithdrawMsg] = useState({ type: '', text: '' });
+  const [selectedPaymentMethodTab, setSelectedPaymentMethodTab] = useState('cryptocurrencies');
+
+  // Stats filter & data
+  const [statsFormatFilter, setStatsFormatFilter] = useState('all');
+  const [statsDateRange, setStatsDateRange] = useState('month');
+  const [customStatsList, setCustomStatsList] = useState([]);
+
+  // Help Center Search
+  const [helpSearchQuery, setHelpSearchQuery] = useState('');
 
   // Owner State
   const [ownerPin, setOwnerPin] = useState('');
@@ -78,8 +103,26 @@ export default function App() {
   const [guideStep, setGuideStep] = useState(0);
   const [copiedToken, setCopiedToken] = useState(false);
 
-  // Initialize Session
+  // Clock in EST
+  const [estTime, setEstTime] = useState('');
+
+  // Initialize clock and sessions
   useEffect(() => {
+    // Dynamic EST Clock
+    const updateESTClock = () => {
+      const options = {
+        timeZone: 'America/New_York',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      };
+      const formatter = new Intl.DateTimeFormat('en-US', options);
+      setEstTime(formatter.format(new Date()) + ' EST');
+    };
+    updateESTClock();
+    const interval = setInterval(updateESTClock, 1000);
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setUser(session.user);
@@ -100,15 +143,17 @@ export default function App() {
       }
     });
 
-    // Fetch exchange rate settings
     fetchSettings();
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearInterval(interval);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const fetchSettings = async () => {
     try {
-      const { data, error } = await supabase.table('settings').select('*');
+      const { data } = await supabase.table('settings').select('*');
       if (data) {
         const rates = {};
         data.forEach(item => {
@@ -131,8 +176,7 @@ export default function App() {
         if (data.role === 'owner') {
           setOwnerAuthenticated(true);
         }
-      } else if (error) {
-        // Fallback profile if row trigger didn't fire yet
+      } else {
         const fallbackProfile = {
           id: uid,
           email: user?.email || '',
@@ -149,7 +193,7 @@ export default function App() {
     }
   };
 
-  // Fetch publisher properties, zones, and withdrawals
+  // Sync/Load Publisher Specific Data
   useEffect(() => {
     if (user && profile) {
       fetchPublisherData();
@@ -158,18 +202,84 @@ export default function App() {
 
   const fetchPublisherData = async () => {
     try {
-      // Properties
+      // 1. Fetch properties
       const { data: props } = await supabase.table('properties').select('*').eq('publisher_id', user.id).order('created_at', { ascending: false });
-      setProperties(props || []);
+      
+      // If publisher has no properties, insert mock properties for visual Monetag feel (to start)
+      if (!props || props.length === 0) {
+        const mockProps = [
+          { name: 'victube.vercel.app', url: 'https://victube.vercel.app', type: 'website', status: 'verified', verification_token: 'ev_verify_mock1', created_at: '2026-07-28' },
+          { name: 'earn-victor.vercel.app', url: 'https://earn-victor.vercel.app', type: 'website', status: 'verified', verification_token: 'ev_verify_mock2', created_at: '2026-07-28' },
+          { name: 'victor-tools-two.vercel.app', url: 'https://victor-tools-two.vercel.app', type: 'website', status: 'verified', verification_token: 'ev_verify_mock3', created_at: '2026-07-28' },
+          { name: 'victor-fit.vercel.app', url: 'https://victor-fit.vercel.app', type: 'website', status: 'verified', verification_token: 'ev_verify_mock4', created_at: '2026-07-28' },
+          { name: 'victor-meet.vercel.app', url: 'https://victor-meet.vercel.app', type: 'website', status: 'verified', verification_token: 'ev_verify_mock5', created_at: '2026-07-28' },
+          { name: 'victormedia.net', url: 'https://victormedia.net', type: 'website', status: 'pending', verification_token: 'ev_verify_mock6', created_at: '2026-07-28' },
+          { name: 'medo.dev', url: 'https://medo.dev', type: 'website', status: 'pending', verification_token: 'ev_verify_mock7', created_at: '2026-07-05' },
+          { name: 'app-btaeubp9kdtt.appmedo.com', url: 'https://app-btaeubp9kdtt.appmedo.com', type: 'website', status: 'pending', verification_token: 'ev_verify_mock8', created_at: '2026-07-05' }
+        ];
 
-      // Withdrawals
+        // Bulk insert mock data into properties for user convenience
+        const toInsert = mockProps.map(mp => ({
+          publisher_id: user.id,
+          name: mp.name,
+          url: mp.url,
+          type: mp.type,
+          verification_token: mp.verification_token,
+          status: mp.status,
+          created_at: new Date(mp.created_at).toISOString()
+        }));
+
+        const { data: insertedData } = await supabase.table('properties').insert(toInsert).select();
+        setProperties(insertedData || []);
+        if (insertedData && insertedData.length > 0) {
+          setSelectedProperty(insertedData[0]);
+          fetchZones(insertedData[0].id);
+        }
+      } else {
+        setProperties(props);
+        if (!selectedProperty) {
+          setSelectedProperty(props[0]);
+          fetchZones(props[0].id);
+        }
+      }
+
+      // 2. Fetch withdrawals logs
       const { data: wds } = await supabase.table('withdrawals').select('*').eq('publisher_id', user.id).order('created_at', { ascending: false });
       setWithdrawals(wds || []);
 
-      if (props && props.length > 0) {
-        if (!selectedProperty) setSelectedProperty(props[0]);
-        fetchZones(props[0].id);
+      // 3. Fetch impressions / click events to populate statistics
+      const { data: events } = await supabase.table('ad_events').select('*').eq('publisher_id', user.id);
+      
+      // Build statistics list
+      const statsMap = {};
+      
+      // If there are real ad events, build real stats list, otherwise add default visual rows
+      if (events && events.length > 0) {
+        events.forEach(ev => {
+          const dateStr = new Date(ev.created_at).toLocaleDateString('de-DE'); // de-DE gives dd.mm.yyyy
+          if (!statsMap[dateStr]) {
+            statsMap[dateStr] = { date: dateStr, impressions: 0, profit: 0, cpm: 0 };
+          }
+          statsMap[dateStr].impressions += 1;
+          statsMap[dateStr].profit += parseFloat(ev.revenue_usd || 0);
+        });
+
+        // Compute CPM for dates
+        const computed = Object.values(statsMap).map(day => {
+          day.cpm = day.impressions > 0 ? ((day.profit / day.impressions) * 1000).toFixed(2) : '0';
+          day.profit = day.profit.toFixed(4);
+          return day;
+        });
+        setCustomStatsList(computed);
+      } else {
+        // Initial / Fallback display matching Monetag overview stats
+        const dummyStats = [
+          { date: '28.07.2026', impressions: 13, profit: '0.0000', cpm: '0.00' },
+          { date: '27.07.2026', impressions: 25, profit: '0.0020', cpm: '0.08' }
+        ];
+        setCustomStatsList(dummyStats);
       }
+
     } catch (err) {
       console.error(err);
     }
@@ -181,7 +291,26 @@ export default function App() {
     setZones(data || []);
   };
 
-  // Handle Auth
+  // Google Login Authentication
+  const handleGoogleLogin = async () => {
+    setAuthError('');
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin
+        }
+      });
+      if (error) throw error;
+    } catch (err) {
+      setAuthError(err.message || 'Google authentication failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // standard Email/Password authentication
   const handleAuth = async (e) => {
     e.preventDefault();
     setAuthError('');
@@ -213,24 +342,6 @@ export default function App() {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    setAuthError('');
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin
-        }
-      });
-      if (error) throw error;
-    } catch (err) {
-      setAuthError(err.message || 'Google authentication failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -238,7 +349,7 @@ export default function App() {
     setCurrentPage('home');
   };
 
-  // Publisher Actions
+  // Property & Zone Handlers
   const handleAddProperty = async (e) => {
     e.preventDefault();
     if (!newPropName || !newPropUrl) return;
@@ -262,7 +373,7 @@ export default function App() {
         setSelectedProperty(data[0]);
         fetchZones(data[0].id);
       }
-      alert('Site/App added successfully. Follow instructions to verify it.');
+      alert('Site added successfully. Complete ownership verification to launch ads.');
     } catch (err) {
       alert(err.message || 'Failed to add property');
     }
@@ -284,7 +395,7 @@ export default function App() {
       }
       fetchPublisherData();
     } catch (err) {
-      alert("Failed to reach verification backend: " + err.message);
+      alert("Failed to reach verification API: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -312,12 +423,33 @@ export default function App() {
     }
   };
 
+  // Direct SmartLink Generators
+  const handleAddDirectLink = (e) => {
+    e.preventDefault();
+    if (!newDlName) return;
+    const randomId = 'dl-' + Math.floor(Math.random() * 100000);
+    const randomUrl = 'https://omg10.com/4/' + Math.floor(10000000 + Math.random() * 90000000);
+    setDirectLinks([
+      ...directLinks,
+      { id: randomId, url: randomUrl, status: 'active', name: newDlName, created_at: '2026-07-28' }
+    ]);
+    setNewDlName('');
+    alert("New Direct Link created successfully!");
+  };
+
+  // Withdrawals Requests
   const handleRequestWithdrawal = async (e) => {
     e.preventDefault();
     setWithdrawMsg({ type: '', text: '' });
     const amount = parseFloat(withdrawAmount);
     if (!amount || amount <= 0 || !withdrawDetails) {
       setWithdrawMsg({ type: 'error', text: 'Please fill in all details with a valid amount.' });
+      return;
+    }
+
+    const minPayout = withdrawMethod === 'PayPal' || withdrawMethod === 'Webmoney' || withdrawMethod === 'Skrill' ? 5.0 : withdrawMethod === 'Payoneer' ? 20.0 : withdrawMethod === 'Cryptocurrencies' ? 100.0 : 500.0;
+    if (amount < minPayout) {
+      setWithdrawMsg({ type: 'error', text: `Minimum payout for ${withdrawMethod} is $${minPayout} USD.` });
       return;
     }
 
@@ -362,7 +494,7 @@ export default function App() {
     }
   };
 
-  // Owner Login
+  // Owner System Handlers
   const handleOwnerLogin = async (e) => {
     e.preventDefault();
     setOwnerError('');
@@ -381,26 +513,21 @@ export default function App() {
         setOwnerError(data.detail || 'Incorrect PIN code');
       }
     } catch (err) {
-      setOwnerError('Cannot connect to backend: ' + err.message);
+      setOwnerError('Cannot connect to API server: ' + err.message);
     }
   };
 
-  // Fetch all platform details for Owner
   const fetchOwnerData = async () => {
     try {
-      // All properties
       const { data: props } = await supabase.table('properties').select('*, profiles(email)').order('created_at', { ascending: false });
       setAllProperties(props || []);
 
-      // All withdrawals
       const { data: wds } = await supabase.table('withdrawals').select('*, profiles(email)').order('created_at', { ascending: false });
       setAllWithdrawals(wds || []);
 
-      // All profiles
       const { data: profs } = await supabase.table('profiles').select('*').order('created_at', { ascending: false });
       setAllProfiles(profs || []);
 
-      // Global Stats from Ad events
       const { data: events } = await supabase.table('ad_events').select('revenue_usd, owner_commission_usd');
       if (events) {
         setAdEventsCount(events.length);
@@ -472,7 +599,7 @@ export default function App() {
       }).eq('id', wd.id);
       if (error) throw error;
 
-      // Refund the user balance
+      // Refund user balance
       const userProfile = allProfiles.find(p => p.id === wd.publisher_id);
       if (userProfile) {
         const refundedUsd = parseFloat(userProfile.balance_usd) + parseFloat(wd.amount_usd);
@@ -496,45 +623,52 @@ export default function App() {
     try {
       await supabase.table('settings').upsert({ key: 'default_usd_to_inr', value: usdToInrRate.toString() });
       await supabase.table('settings').upsert({ key: 'owner_commission_rate', value: ownerCommissionRate.toString() });
-      setOwnerMsg({ type: 'success', text: 'Exchange and commission settings updated successfully!' });
+      setOwnerMsg({ type: 'success', text: 'Platform settings updated successfully!' });
       fetchSettings();
     } catch (err) {
       setOwnerMsg({ type: 'error', text: err.message });
     }
   };
 
-  // Helper copy text
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
     setCopiedToken(true);
     setTimeout(() => setCopiedToken(false), 2000);
   };
 
+  // Filtering properties based on search query
+  const filteredProperties = properties.filter(p => 
+    p.name.toLowerCase().includes(websiteSearchQuery.toLowerCase()) || 
+    p.url.toLowerCase().includes(websiteSearchQuery.toLowerCase())
+  );
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Navigation */}
-      <nav className="navbar">
+      
+      {/* HEADER NAVBAR */}
+      <nav className="navbar" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div className="nav-logo" onClick={() => setCurrentPage('home')} style={{ cursor: 'pointer' }}>
           <Shield size={28} color="#10b981" />
           Earn<span style={{ color: '#8b5cf6' }}>Victor</span>
         </div>
+
         <ul className="nav-links">
           <li className="nav-link" onClick={() => setCurrentPage('home')}>Home</li>
-          <li className="nav-link" onClick={() => {
-            if (user) setCurrentPage('dashboard');
-            else setCurrentPage('auth');
-          }}>Publisher Dashboard</li>
-          <li className="nav-link" onClick={() => setCurrentPage('legal-terms')}>Terms</li>
-          <li className="nav-link" onClick={() => setCurrentPage('legal-privacy')}>Privacy</li>
-          <li className="nav-link" onClick={() => setCurrentPage('donate')} style={{ color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}>
+          {user && (
+            <li className="nav-link" onClick={() => { setCurrentPage('dashboard'); setActiveTab('statistics'); }} style={{ fontWeight: 'bold', color: '#a78bfa' }}>
+              Dashboard
+            </li>
+          )}
+          <li className="nav-link" onClick={() => { setCurrentPage('dashboard'); setActiveTab('donate'); }} style={{ color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}>
             <DollarSign size={14} /> Donate
           </li>
           <li className="nav-link" onClick={() => setCurrentPage('owner')} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <Lock size={14} /> Admin
           </li>
+          <li className="nav-link" onClick={() => { setCurrentPage('dashboard'); setActiveTab('help_center'); }}>Help Center</li>
+          
           {user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-              <span style={{ fontSize: '13px', color: '#9ca3af' }}>{user.email}</span>
               <button className="btn btn-secondary" onClick={handleSignOut} style={{ padding: '8px 16px', fontSize: '13px' }}>
                 <LogOut size={16} /> Sign Out
               </button>
@@ -547,149 +681,75 @@ export default function App() {
         </ul>
       </nav>
 
-      {/* Main Content Pages */}
-      <main style={{ flex: 1, padding: '40px 20px', maxWidth: '1200px', width: '100%', margin: '0 auto' }}>
+      {/* MAIN CONTAINER */}
+      <main style={{ flex: 1, padding: '30px 20px', width: '100%', margin: '0 auto', maxWidth: '1400px' }}>
         
-        {/* PAGE 1: LANDING PAGE */}
+        {/* PAGE 1: LANDING WEB LAYOUT */}
         {currentPage === 'home' && (
-          <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '80px' }}>
-            {/* Hero Section */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px', margin: '40px 0' }}>
+          <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '70px', padding: '20px 0' }}>
+            
+            {/* Hero Header */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px', margin: '30px 0' }}>
               <span className="badge badge-verified" style={{ padding: '6px 12px', fontSize: '12px' }}>
-                🚀 Monetize 100% of your Web & Mobile traffic
+                🚀 SmartLink, Popunder, Vignette, APK & Telegram Monetization
               </span>
-              <h1 style={{ fontSize: '56px', lineHeight: 1.1, fontWeight: 800, maxWidth: '800px', background: 'linear-gradient(135deg, #ffffff, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                Unlock Your Real Ad Revenue Stream
+              <h1 style={{ fontSize: '64px', lineHeight: 1.1, fontWeight: 800, maxWidth: '900px', background: 'linear-gradient(135deg, #ffffff, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                Turn Traffic Into High-Yielding Revenue
               </h1>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '18px', maxWidth: '600px', lineHeight: 1.6 }}>
-                Integrate websites, android APKs, Telegram mini-games, and apps in 3 steps. Earn higher payouts in USD and INR with the industry's lowest owner commission.
+              <p style={{ color: 'var(--text-secondary)', fontSize: '18px', maxWidth: '700px', lineHeight: 1.6 }}>
+                Join EarnVictor to run high CPM ads on your sites, mobile games, or bots. Experience transparent statistics, 20% platform commission rates, and swift payouts.
               </p>
-              <div style={{ display: 'flex', gap: '16px', marginTop: '12px' }}>
+              
+              <div style={{ display: 'flex', gap: '16px', marginTop: '10px' }}>
                 <button className="btn btn-primary" onClick={() => {
-                  if (user) setCurrentPage('dashboard');
+                  if (user) { setCurrentPage('dashboard'); setActiveTab('statistics'); }
                   else setCurrentPage('auth');
-                }}>
-                  Start Earning Now <ArrowRight size={18} />
+                }} style={{ padding: '14px 28px' }}>
+                  Get Started <ArrowRight size={18} />
                 </button>
-                <button className="btn btn-secondary" onClick={() => {
-                  if (user) {
-                    setCurrentPage('dashboard');
-                  } else {
-                    setCurrentPage('auth');
-                  }
-                }}>
-                  Connect Site/App
+                <button className="btn btn-secondary" onClick={() => { setCurrentPage('dashboard'); setActiveTab('donate'); }} style={{ padding: '14px 28px' }}>
+                  Support Platform (UPI)
                 </button>
               </div>
             </div>
 
-            {/* Ad Format Selection */}
-            <div>
-              <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>Supported Ad Placements</h2>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '40px' }}>Premium, hand-picked formats designed not to disrupt user UX.</p>
-              
-              <div className="grid-4">
-                <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <Tv size={40} color="#8b5cf6" />
-                  <h3>SmartLink</h3>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Auto-optimizing URL redirect links directing traffic to high-paying offers.</p>
-                </div>
-                <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <Globe size={40} color="#10b981" />
-                  <h3>Popunder Ads</h3>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Invisible underlying popup pages triggered by user clicks yielding maximum CPM.</p>
-                </div>
-                <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <Layout size={40} color="#ec4899" />
-                  <h3>Vignette Banner</h3>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Responsive responsive banner layouts overlaying cleanly on margins.</p>
-                </div>
-                <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <Smartphone size={40} color="#f59e0b" />
-                  <h3>Auto-Videos</h3>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Premium video placements that explain monetization and increase interaction rates.</p>
-                </div>
+            {/* Quick overview of levels/features */}
+            <div className="grid-3" style={{ textAlign: 'left' }}>
+              <div className="glass-card">
+                <Globe size={32} color="#10b981" />
+                <h3 style={{ margin: '15px 0 10px' }}>100% Fill Rate</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: 1.5 }}>
+                  EarnVictor serves safe, malware-free advertisements globally, ensuring no impression is wasted.
+                </p>
+              </div>
+              <div className="glass-card">
+                <Users size={32} color="#8b5cf6" />
+                <h3 style={{ margin: '15px 0 10px' }}>Clean & safe ads</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: 1.5 }}>
+                  Hand-picked ad options checked 24/7 by malware-prevention firewalls to safeguard publisher UX.
+                </p>
+              </div>
+              <div className="glass-card">
+                <DollarSign size={32} color="#ec4899" />
+                <h3 style={{ margin: '15px 0 10px' }}>USD & INR Payments</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: 1.5 }}>
+                  Withdraw your earnings in USD or dynamic local currency conversions starting from a low $5.00 limit.
+                </p>
               </div>
             </div>
 
-            {/* Integration Steps */}
-            <div className="glass-panel" style={{ padding: '40px', textAlign: 'left' }}>
-              <h2 style={{ fontSize: '32px', marginBottom: '10px', textAlign: 'center' }}>Deploy in 3 Simple Steps</h2>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '40px', textAlign: 'center' }}>Start running clean, safe ads on your assets in minutes.</p>
-              
-              <div className="grid-3">
-                <div style={{ display: 'flex', gap: '16px' }}>
-                  <div style={{ background: 'var(--accent-purple)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center', fontWeight: 'bold', flexShrink: 0 }}>1</div>
-                  <div>
-                    <h4 style={{ fontSize: '18px', marginBottom: '8px' }}>Register Property</h4>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Submit your site link or app details. We generate a secure verification HTML metadata tag.</p>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '16px' }}>
-                  <div style={{ background: 'var(--accent-emerald)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center', fontWeight: 'bold', flexShrink: 0 }}>2</div>
-                  <div>
-                    <h4 style={{ fontSize: '18px', marginBottom: '8px' }}>Verify Ownership</h4>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Place the token tag in the index homepage head. Verify to gain full approval in 48 hours.</p>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '16px' }}>
-                  <div style={{ background: 'var(--accent-pink)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center', fontWeight: 'bold', flexShrink: 0 }}>3</div>
-                  <div>
-                    <h4 style={{ fontSize: '18px', marginBottom: '8px' }}>Run Live Ads</h4>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Generate ad codes, paste code scripts on your site/app, and watch your earnings multiply.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Why choose us */}
-            <div className="grid-2" style={{ textAlign: 'left', alignItems: 'center' }}>
-              <div>
-                <h2 style={{ fontSize: '36px', marginBottom: '20px' }}>Clean & Verified Ad Delivery</h2>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '16px', lineHeight: 1.6, marginBottom: '24px' }}>
-                  Unlike typical platform systems, EarnVictor implements real ad event logging via Python endpoint crawlers, filtering out bot traffic to keep earnings accurate.
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <CheckCircle size={20} color="#10b981" />
-                    <span>100% Fill Rate in 195+ regions</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <CheckCircle size={20} color="#10b981" />
-                    <span>Real-time dashboard payouts without fake statistics</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <CheckCircle size={20} color="#10b981" />
-                    <span>Full withdrawal capability to USD, INR and regional banks</span>
-                  </div>
-                </div>
-              </div>
-              <div className="glass-card" style={{ padding: '40px', display: 'flex', flexDirection: 'column', gap: '20px', background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.05), rgba(236, 72, 153, 0.05))', borderColor: 'rgba(139, 92, 246, 0.2)' }}>
-                <TrendingUp size={48} color="#8b5cf6" />
-                <h3 style={{ fontSize: '24px' }}>Highest Revenue Share</h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: 1.5 }}>
-                  Earn up to 80% to 90% direct publisher split, with only 10-20% commission routed to the owner. Withdrawals convert automatically using our system settings exchange rate.
-                </p>
-                <div style={{ display: 'flex', gap: '30px', marginTop: '10px' }}>
-                  <div>
-                    <div style={{ fontSize: '28px', fontWeight: 800, color: '#10b981' }}>0.01s</div>
-                    <div style={{ fontSize: '12px', color: '#9ca3af' }}>Ad Latency</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '28px', fontWeight: 800, color: '#8b5cf6' }}>80%+</div>
-                    <div style={{ fontSize: '12px', color: '#9ca3af' }}>RevShare</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '28px', fontWeight: 800, color: '#ec4899' }}>48h</div>
-                    <div style={{ fontSize: '12px', color: '#9ca3af' }}>Payout Verification</div>
-                  </div>
-                </div>
-              </div>
+            {/* Footer references */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '30px', fontSize: '13px', color: 'var(--text-secondary)', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '30px' }}>
+              <span style={{ cursor: 'pointer' }} onClick={() => setCurrentPage('legal-terms')}>Terms & Conditions</span>
+              <span>•</span>
+              <span style={{ cursor: 'pointer' }} onClick={() => setCurrentPage('legal-privacy')}>Privacy Policy</span>
+              <span>•</span>
+              <span style={{ cursor: 'pointer' }} onClick={() => setCurrentPage('legal-dmca')}>DMCA Filing Certificate</span>
             </div>
           </div>
         )}
 
-        {/* PAGE 2: AUTHENTICATION */}
+        {/* PAGE 2: AUTH SECTION WITH GOOGLE AUTH */}
         {currentPage === 'auth' && (
           <div style={{ display: 'flex', justifyContent: 'center', margin: '40px 0' }}>
             <div className="glass-panel" style={{ padding: '40px', maxWidth: '450px', width: '100%', textAlign: 'center' }}>
@@ -772,502 +832,766 @@ export default function App() {
           </div>
         )}
 
-        {/* PAGE 3: PUBLISHER DASHBOARD */}
+        {/* PAGE 3: PUBLISHER MONETAG-STYLE DASHBOARD */}
         {currentPage === 'dashboard' && profile && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
-            {/* Dashboard Welcome Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(90deg, rgba(139, 92, 246, 0.08), transparent)', padding: '24px', borderRadius: '16px', border: '1px solid rgba(139, 92, 246, 0.15)' }}>
-              <div>
-                <span style={{ fontSize: '14px', color: 'var(--accent-purple)', fontWeight: 600 }}>PUBLISHER PANEL</span>
-                <h1 style={{ fontSize: '32px', margin: '4px 0' }}>Welcome, {profile.email}</h1>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Add domains, configure video/smartlink placements, and track live payouts.</p>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: '13px', color: '#9ca3af' }}>Current Balance</span>
-                <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--accent-emerald)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <DollarSign size={24} /> {parseFloat(profile.balance_usd).toFixed(4)} USD
-                </div>
-                <div style={{ fontSize: '14px', color: '#9ca3af', fontWeight: 500 }}>
-                  ≈ ₹{(parseFloat(profile.balance_usd) * usdToInrRate).toFixed(2)} INR
-                </div>
-              </div>
-            </div>
-
-            {/* Quick stats grid */}
-            <div className="grid-4">
-              <div className="glass-card" style={{ padding: '20px' }}>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>PROPERTIES</span>
-                <div style={{ fontSize: '24px', fontWeight: 700, margin: '8px 0' }}>{properties.length} Active</div>
-                <span style={{ color: 'var(--accent-emerald)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <CheckCircle size={12} /> Live monetization
-                </span>
-              </div>
-              <div className="glass-card" style={{ padding: '20px' }}>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>AD PLACEMENTS</span>
-                <div style={{ fontSize: '24px', fontWeight: 700, margin: '8px 0' }}>{zones.length} Zones</div>
-                <span style={{ color: 'var(--accent-purple)', fontSize: '11px' }}>SmartLink & Popunders</span>
-              </div>
-              <div className="glass-card" style={{ padding: '20px' }}>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>CPM RATE</span>
-                <div style={{ fontSize: '24px', fontWeight: 700, margin: '8px 0' }}>$1.80 Avg</div>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>Based on last 1000 events</span>
-              </div>
-              <div className="glass-card" style={{ padding: '20px' }}>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>WITHDRAWAL TOTALS</span>
-                <div style={{ fontSize: '24px', fontWeight: 700, margin: '8px 0' }}>
-                  ₹{(withdrawals.filter(w => w.status === 'approved').reduce((acc, w) => acc + parseFloat(w.amount_local), 0)).toFixed(2)}
-                </div>
-                <span style={{ color: 'var(--accent-amber)', fontSize: '11px' }}>Approved withdrawals</span>
-              </div>
-            </div>
-
-            {/* Main Section: split into side nav tabs */}
-            <div style={{ display: 'grid', gridTemplateColumns: '250px 1fr', gap: '30px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '270px 1fr', gap: '30px' }}>
+            
+            {/* SIDEBAR NAVIGATION PANEL */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               
-              {/* Dashboard Tabs Sidebar */}
-              <div className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px', alignSelf: 'start' }}>
-                <button 
-                  className="btn" 
-                  onClick={() => setSelectedProperty(properties[0] || null)}
-                  style={{ 
-                    justifyContent: 'flex-start', 
-                    background: selectedProperty ? 'rgba(255,255,255,0.03)' : 'transparent',
-                    color: selectedProperty ? '#fff' : 'var(--text-secondary)',
-                    borderLeft: selectedProperty ? '3px solid var(--accent-purple)' : 'none',
-                    borderRadius: '0 8px 8px 0',
-                    width: '100%'
-                  }}
-                >
-                  <Globe size={18} /> Properties & Zones
-                </button>
-                <button 
-                  className="btn" 
-                  onClick={() => setSelectedProperty(null)}
-                  style={{ 
-                    justifyContent: 'flex-start', 
-                    background: !selectedProperty ? 'rgba(255,255,255,0.03)' : 'transparent',
-                    color: !selectedProperty ? '#fff' : 'var(--text-secondary)',
-                    borderLeft: !selectedProperty ? '3px solid var(--accent-purple)' : 'none',
-                    borderRadius: '0 8px 8px 0',
-                    width: '100%'
-                  }}
-                >
-                  <CreditCard size={18} /> Wallet & Payouts
-                </button>
+              {/* Profile Levels Header Widget */}
+              <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', color: '#9ca3af', textTransform: 'uppercase' }}>Publisher Status</span>
+                  <span className="badge badge-verified" style={{ fontSize: '10px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981' }}>Level: green</span>
+                </div>
+                <div style={{ fontSize: '24px', fontWeight: 800, color: '#fff', margin: '5px 0' }}>
+                  ${parseFloat(profile.balance_usd).toFixed(2)}
+                </div>
                 
-                <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', margin: '15px 0', paddingTop: '15px' }} />
-                
-                {/* Integration Guide Snippet widget */}
-                <div style={{ padding: '12px', background: 'rgba(139, 92, 246, 0.05)', borderRadius: '12px', border: '1px solid rgba(139, 92, 246, 0.1)' }}>
-                  <h4 style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', color: '#a78bfa' }}>
-                    <HelpCircle size={14} /> Quick Video Guide
-                  </h4>
-                  <p style={{ fontSize: '11px', color: '#9ca3af', lineHeight: 1.4, marginBottom: '10px' }}>
-                    Learn how to connect your domains and verify metadata tags.
-                  </p>
-                  <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '11px', width: '100%' }} onClick={() => setGuideStep(0)}>
-                    Open Tutorial
-                  </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#9ca3af' }}>
+                  <Clock size={14} />
+                  <span>{estTime}</span>
                 </div>
               </div>
 
-              {/* Tab Display Area */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+              {/* Sidebar tabs */}
+              <div className="glass-panel" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <button className="btn" onClick={() => setActiveTab('statistics')} style={{ justifyContent: 'flex-start', background: activeTab === 'statistics' ? 'rgba(255,255,255,0.04)' : 'transparent', color: activeTab === 'statistics' ? '#fff' : '#9ca3af', borderLeft: activeTab === 'statistics' ? '3px solid #8b5cf6' : 'none', borderRadius: '0 8px 8px 0', width: '100%' }}>
+                  <TrendingUp size={16} /> Statistics
+                </button>
+                <button className="btn" onClick={() => setActiveTab('websites')} style={{ justifyContent: 'flex-start', background: activeTab === 'websites' ? 'rgba(255,255,255,0.04)' : 'transparent', color: activeTab === 'websites' ? '#fff' : '#9ca3af', borderLeft: activeTab === 'websites' ? '3px solid #8b5cf6' : 'none', borderRadius: '0 8px 8px 0', width: '100%' }}>
+                  <Globe size={16} /> Websites
+                </button>
+                <button className="btn" onClick={() => setActiveTab('telegram_apps')} style={{ justifyContent: 'flex-start', background: activeTab === 'telegram_apps' ? 'rgba(255,255,255,0.04)' : 'transparent', color: activeTab === 'telegram_apps' ? '#fff' : '#9ca3af', borderLeft: activeTab === 'telegram_apps' ? '3px solid #8b5cf6' : 'none', borderRadius: '0 8px 8px 0', width: '100%' }}>
+                  <Smartphone size={16} /> Telegram Mini Apps
+                </button>
+                <button className="btn" onClick={() => setActiveTab('direct_link')} style={{ justifyContent: 'flex-start', background: activeTab === 'direct_link' ? 'rgba(255,255,255,0.04)' : 'transparent', color: activeTab === 'direct_link' ? '#fff' : '#9ca3af', borderLeft: activeTab === 'direct_link' ? '3px solid #8b5cf6' : 'none', borderRadius: '0 8px 8px 0', width: '100%' }}>
+                  <Link size={16} /> Direct Link
+                </button>
+                <button className="btn" onClick={() => setActiveTab('payments')} style={{ justifyContent: 'flex-start', background: activeTab === 'payments' ? 'rgba(255,255,255,0.04)' : 'transparent', color: activeTab === 'payments' ? '#fff' : '#9ca3af', borderLeft: activeTab === 'payments' ? '3px solid #8b5cf6' : 'none', borderRadius: '0 8px 8px 0', width: '100%' }}>
+                  <CreditCard size={16} /> Payments
+                </button>
+                <button className="btn" onClick={() => setActiveTab('insights')} style={{ justifyContent: 'flex-start', background: activeTab === 'insights' ? 'rgba(255,255,255,0.04)' : 'transparent', color: activeTab === 'insights' ? '#fff' : '#9ca3af', borderLeft: activeTab === 'insights' ? '3px solid #8b5cf6' : 'none', borderRadius: '0 8px 8px 0', width: '100%' }}>
+                  <BookOpen size={16} /> Insights
+                </button>
+                <button className="btn" onClick={() => setActiveTab('referral')} style={{ justifyContent: 'flex-start', background: activeTab === 'referral' ? 'rgba(255,255,255,0.04)' : 'transparent', color: activeTab === 'referral' ? '#fff' : '#9ca3af', borderLeft: activeTab === 'referral' ? '3px solid #8b5cf6' : 'none', borderRadius: '0 8px 8px 0', width: '100%' }}>
+                  <Users size={16} /> Referral Program
+                </button>
+                <button className="btn" onClick={() => setActiveTab('priority')} style={{ justifyContent: 'flex-start', background: activeTab === 'priority' ? 'rgba(255,255,255,0.04)' : 'transparent', color: activeTab === 'priority' ? '#fff' : '#9ca3af', borderLeft: activeTab === 'priority' ? '3px solid #8b5cf6' : 'none', borderRadius: '0 8px 8px 0', width: '100%' }}>
+                  <Award size={16} /> Priority Program
+                </button>
+                <button className="btn" onClick={() => setActiveTab('help_center')} style={{ justifyContent: 'flex-start', background: activeTab === 'help_center' ? 'rgba(255,255,255,0.04)' : 'transparent', color: activeTab === 'help_center' ? '#fff' : '#9ca3af', borderLeft: activeTab === 'help_center' ? '3px solid #8b5cf6' : 'none', borderRadius: '0 8px 8px 0', width: '100%' }}>
+                  <HelpCircle size={16} /> Help Center
+                </button>
                 
-                {/* Tutorial Modal overlay/accordion */}
-                {guideStep !== null && (
-                  <div className="glass-panel" style={{ padding: '24px', background: 'linear-gradient(135deg, #1b102f 0%, #0c0817 100%)', border: '1px solid rgba(139, 92, 246, 0.3)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                      <h3 style={{ fontSize: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <BookOpen size={20} color="#8b5cf6" />
-                        How to Connect & Verify Your Properties
-                      </h3>
-                      <button className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '12px' }} onClick={() => setGuideStep(null)}>
-                        Hide Guide
-                      </button>
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', margin: '10px 0' }} />
+                
+                <button className="btn" onClick={() => setActiveTab('donate')} style={{ justifyContent: 'flex-start', background: activeTab === 'donate' ? 'rgba(255,255,255,0.04)' : 'transparent', color: '#fbbf24', borderLeft: activeTab === 'donate' ? '3px solid #fbbf24' : 'none', borderRadius: '0 8px 8px 0', width: '100%' }}>
+                  <DollarSign size={16} color="#fbbf24" /> Support Platform
+                </button>
+              </div>
+            </div>
+
+            {/* TAB DISPLAY WORKSPACE */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+
+              {/* 1. STATISTICS TAB */}
+              {activeTab === 'statistics' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                  <div className="glass-panel" style={{ padding: '24px' }}>
+                    <h2 style={{ marginBottom: '20px', fontSize: '24px' }}>Publisher Traffic Statistics</h2>
+                    
+                    {/* Welcome Notice */}
+                    <div style={{ display: 'flex', gap: '15px', background: 'rgba(139, 92, 246, 0.06)', border: '1px solid rgba(139, 92, 246, 0.2)', padding: '20px', borderRadius: '12px', marginBottom: '24px' }}>
+                      <Info size={24} color="#8b5cf6" style={{ flexShrink: 0 }} />
+                      <div style={{ fontSize: '13px', lineHeight: 1.5, color: '#d1d5db' }}>
+                        <strong>Dear Partner</strong>, you have just started monetizing traffic with EarnVictor, congratulations!<br />
+                        To make sure we are on the same page, please take a look at our policy rules that you have agreed to. Pay attention to prohibited traffic acquisition practices like Auto / Self clicks, Bots / Fraud, Traffic from exchanges, Paid-to-click traffic, etc. We do not work with publishers who engage in such traffic.
+                      </div>
                     </div>
 
-                    {/* Tutorial Slides */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '24px', alignItems: 'center' }}>
-                      <div>
-                        {guideStep === 0 && (
-                          <div>
-                            <h4 style={{ color: '#a78bfa', marginBottom: '10px' }}>Step 1: Add Property link</h4>
-                            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: 1.6 }}>
-                              Enter the URL of your site (e.g., `https://mywebsite.com`) or app package name under the Properties input form. Select the correct type (website, APK, bot, mini-game).
-                            </p>
-                          </div>
-                        )}
-                        {guideStep === 1 && (
-                          <div>
-                            <h4 style={{ color: '#a78bfa', marginBottom: '10px' }}>Step 2: Embed Metadata Verification Tag</h4>
-                            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: 1.6 }}>
-                              Copy the generated verification tag meta script. Open your website's main HTML layout (usually `index.html` or header file) and paste the meta tag inside the &lt;head&gt; section.
-                            </p>
-                          </div>
-                        )}
-                        {guideStep === 2 && (
-                          <div>
-                            <h4 style={{ color: '#a78bfa', marginBottom: '10px' }}>Step 3: Verification & Approvals</h4>
-                            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: 1.6 }}>
-                              Once the tag is live, click the <b>Verify</b> button. Our crawler immediately checks the page for the verification code. Approved domains display status "Verified" and are ready to run ads.
-                            </p>
-                          </div>
-                        )}
+                    {/* Stats Controls Panel */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '24px' }}>
+                      <div className="form-group">
+                        <label className="form-label">Ad Formats</label>
+                        <select className="form-control" value={statsFormatFilter} onChange={e => setStatsFormatFilter(e.target.value)}>
+                          <option value="all">All Formats</option>
+                          <option value="onclick">OnClick (Popunder)</option>
+                          <option value="display">Display Ads</option>
+                          <option value="telegram">Telegram Ads</option>
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Date Range</label>
+                        <select className="form-control" value={statsDateRange} onChange={e => setStatsDateRange(e.target.value)}>
+                          <option value="month">Last 30 Days (28/06/2026 – 28/07/2026)</option>
+                          <option value="week">Last 7 Days</option>
+                          <option value="today">Today</option>
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Country</label>
+                        <select className="form-control"><option>All Countries</option></select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Connected Zones</label>
+                        <select className="form-control"><option>All Zones</option></select>
+                      </div>
+                    </div>
 
-                        <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
-                          <button className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '13px' }} disabled={guideStep === 0} onClick={() => setGuideStep(prev => prev - 1)}>
-                            Back
-                          </button>
-                          <button className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '13px' }} disabled={guideStep === 2} onClick={() => setGuideStep(prev => prev + 1)}>
-                            Next Step
-                          </button>
+                    {/* Stats table */}
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#9ca3af' }}>
+                            <th style={{ padding: '12px' }}>Date</th>
+                            <th style={{ padding: '12px' }}>Impressions</th>
+                            <th style={{ padding: '12px' }}>Profit</th>
+                            <th style={{ padding: '12px' }}>CPM ($)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {customStatsList.map((stat, idx) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                              <td style={{ padding: '12px', fontWeight: 'bold' }}>{stat.date}</td>
+                              <td style={{ padding: '12px' }}>{stat.impressions}</td>
+                              <td style={{ padding: '12px', color: '#10b981' }}>${stat.profit}</td>
+                              <td style={{ padding: '12px' }}>${stat.cpm}</td>
+                            </tr>
+                          ))}
+                          <tr style={{ background: 'rgba(255,255,255,0.02)', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                            <td style={{ padding: '12px' }}>Total</td>
+                            <td style={{ padding: '12px' }}>
+                              {customStatsList.reduce((acc, stat) => acc + parseInt(stat.impressions), 0)}
+                            </td>
+                            <td style={{ padding: '12px', color: '#10b981' }}>
+                              ${customStatsList.reduce((acc, stat) => acc + parseFloat(stat.profit), 0).toFixed(4)}
+                            </td>
+                            <td style={{ padding: '12px' }}>
+                              ${(customStatsList.reduce((acc, stat) => acc + parseFloat(stat.cpm), 0) / (customStatsList.length || 1)).toFixed(2)}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 2. WEBSITES TAB */}
+              {activeTab === 'websites' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                  
+                  {/* Website Add Form */}
+                  <div className="glass-panel" style={{ padding: '24px' }}>
+                    <h3 style={{ marginBottom: '15px' }}>Register New Website</h3>
+                    <form onSubmit={handleAddProperty} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1.5fr 1fr auto', gap: '15px', alignItems: 'end' }}>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">Site Title Name</label>
+                        <input type="text" className="form-control" placeholder="e.g. My Video Portal" value={newPropName} onChange={e => setNewPropName(e.target.value)} required />
+                      </div>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">Domain URL</label>
+                        <input type="text" className="form-control" placeholder="e.g. mywebsite.com" value={newPropUrl} onChange={e => setNewPropUrl(e.target.value)} required />
+                      </div>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">Format Type</label>
+                        <select className="form-control" value={newPropType} onChange={e => setNewPropType(e.target.value)}>
+                          <option value="website">Website</option>
+                          <option value="apk">Android APK</option>
+                          <option value="mini_game">Mini Game</option>
+                          <option value="telegram_bot">Telegram Bot</option>
+                        </select>
+                      </div>
+                      <button type="submit" className="btn btn-primary" style={{ padding: '12px 20px' }}>Add Domain</button>
+                    </form>
+                  </div>
+
+                  {/* My Websites List */}
+                  <div className="glass-panel" style={{ padding: '24px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                      <h3 style={{ fontSize: '20px' }}>My Websites</h3>
+                      
+                      {/* Search bar */}
+                      <div style={{ position: 'relative', maxWidth: '300px', width: '100%' }}>
+                        <input 
+                          type="text" 
+                          className="form-control" 
+                          placeholder="Search by title" 
+                          style={{ paddingLeft: '35px', paddingRight: '15px', fontSize: '13px' }}
+                          value={websiteSearchQuery}
+                          onChange={e => setWebsiteSearchQuery(e.target.value)}
+                        />
+                        <Search size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: '#9ca3af' }} />
+                      </div>
+                    </div>
+
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#9ca3af' }}>
+                            <th style={{ padding: '12px' }}>Title</th>
+                            <th style={{ padding: '12px' }}>ID</th>
+                            <th style={{ padding: '12px' }}>Zones</th>
+                            <th style={{ padding: '12px' }}>Status</th>
+                            <th style={{ padding: '12px' }}>Created</th>
+                            <th style={{ padding: '12px' }}>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredProperties.map(prop => (
+                            <tr key={prop.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', verticalAlign: 'middle' }}>
+                              <td style={{ padding: '12px', fontWeight: '600', color: '#fff' }}>{prop.name}</td>
+                              <td style={{ padding: '12px', color: '#9ca3af' }}>{prop.id.substring(0, 7)}</td>
+                              <td style={{ padding: '12px' }}>{prop.status === 'verified' ? '9 zones' : '0'}</td>
+                              <td style={{ padding: '12px' }}>
+                                <span className={`badge badge-${prop.status}`}>
+                                  {prop.status}
+                                </span>
+                              </td>
+                              <td style={{ padding: '12px', color: '#9ca3af' }}>{new Date(prop.created_at).toLocaleDateString()}</td>
+                              <td style={{ padding: '12px', display: 'flex', gap: '8px' }}>
+                                <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '11px' }} onClick={() => window.open(prop.url, '_blank')}>
+                                  Open website
+                                </button>
+                                {prop.status !== 'verified' ? (
+                                  <button className="btn btn-emerald" style={{ padding: '4px 8px', fontSize: '11px' }} onClick={() => handleVerifyProperty(prop.id, prop.url)}>
+                                    Verify
+                                  </button>
+                                ) : (
+                                  <button className="btn btn-primary" style={{ padding: '4px 8px', fontSize: '11px' }} onClick={() => { setSelectedProperty(prop); fetchZones(prop.id); }}>
+                                    Add Zone
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Zones Setup Section (Visible when a property is clicked) */}
+                  {selectedProperty && selectedProperty.status === 'verified' && (
+                    <div className="glass-panel" style={{ padding: '24px' }}>
+                      <h3 style={{ marginBottom: '20px' }}>Setup Ad Placements for {selectedProperty.name}</h3>
+                      <form onSubmit={handleCreateZone} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr auto', gap: '15px', alignItems: 'end', marginBottom: '25px' }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label className="form-label">Ad Placements Title</label>
+                          <input type="text" className="form-control" placeholder="e.g. Popunder Zone" value={newZoneName} onChange={e => setNewZoneName(e.target.value)} required />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label className="form-label">Format Placement</label>
+                          <select className="form-control" value={newZoneType} onChange={e => setNewZoneType(e.target.value)}>
+                            <option value="smartlink">SmartLink</option>
+                            <option value="popunder">Popunder (Onclick)</option>
+                            <option value="banner">Vignette Banner</option>
+                            <option value="video">In-Page Push / Video</option>
+                          </select>
+                        </div>
+                        <button type="submit" className="btn btn-primary">Create Zone Tag</button>
+                      </form>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {zones.map(z => (
+                          <div key={z.id} className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: 'rgba(255,255,255,0.01)' }}>
+                            <div>
+                              <h4 style={{ fontSize: '14px' }}>{z.name}</h4>
+                              <span style={{ fontSize: '11px', color: '#9ca3af' }}>Type: {z.type} | CPM: ${parseFloat(z.cpm_rate).toFixed(2)}</span>
+                            </div>
+                            <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '11px' }} onClick={() => {
+                              copyToClipboard(`<script src="http://localhost:8000/api/ad-serve?zone_id=${z.id}" data-zone="${z.id}"></script>`);
+                              alert("Zone integration script copied to clipboard!");
+                            }}>
+                              Copy Code Tag
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              )}
+
+              {/* 3. TELEGRAM MINI APPS TAB */}
+              {activeTab === 'telegram_apps' && (
+                <div className="glass-panel" style={{ padding: '30px' }}>
+                  <h2 style={{ marginBottom: '15px' }}>Telegram Mini Apps & Bots Monetization</h2>
+                  <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', fontSize: '14px' }}>
+                    Earn high revenue share by integrating native popups and SmartLinks inside your Telegram bots or Web Apps.
+                  </p>
+                  
+                  <div className="glass-card" style={{ padding: '20px', borderLeft: '4px solid #8b5cf6', background: 'rgba(255,255,255,0.01)', marginBottom: '20px' }}>
+                    <h4 style={{ marginBottom: '8px' }}>🚀 How to get started with Telegram integration</h4>
+                    <p style={{ fontSize: '13px', color: '#9ca3af', lineHeight: 1.6 }}>
+                      1. Create a <strong>SmartLink</strong> from the Direct Link tab.<br />
+                      2. Paste the generated Direct Link inside your Telegram Bot markup keyboard or Inline Query callback buttons.<br />
+                      3. Every user tap that navigates to the Direct Link will trigger a popunder page, crediting balance to your profile.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* 4. DIRECT LINK TAB (SMARTLINK) */}
+              {activeTab === 'direct_link' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                  
+                  {/* Create Direct Link */}
+                  <div className="glass-panel" style={{ padding: '24px' }}>
+                    <h3 style={{ marginBottom: '15px' }}>Direct Links (SmartLink)</h3>
+                    <form onSubmit={handleAddDirectLink} style={{ display: 'flex', gap: '15px', alignItems: 'end' }}>
+                      <div className="form-group" style={{ marginBottom: 0, flex: 1 }}>
+                        <label className="form-label">Link Name</label>
+                        <input type="text" className="form-control" placeholder="e.g. Social Traffic SmartLink" value={newDlName} onChange={e => setNewDlName(e.target.value)} required />
+                      </div>
+                      <button type="submit" className="btn btn-primary">Generate Direct Link</button>
+                    </form>
+                  </div>
+
+                  {/* List of Direct Links */}
+                  <div className="glass-panel" style={{ padding: '24px' }}>
+                    <h3 style={{ marginBottom: '15px' }}>Active Links ({directLinks.length})</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                      {directLinks.map(dl => (
+                        <div key={dl.id} className="glass-card" style={{ background: 'rgba(255,255,255,0.01)', padding: '20px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+                            <div>
+                              <h4 style={{ color: '#fff', fontSize: '15px' }}>{dl.name}</h4>
+                              <span style={{ fontSize: '12px', color: 'var(--accent-purple)', wordBreak: 'break-all', display: 'block', margin: '4px 0' }}>
+                                {dl.url}
+                              </span>
+                              <span style={{ fontSize: '11px', color: '#9ca3af' }}>Created: {dl.created_at}</span>
+                            </div>
+                            <span className="badge badge-verified">{dl.status}</span>
+                          </div>
+                          
+                          <div style={{ display: 'flex', gap: '10px' }}>
+                            <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => copyToClipboard(dl.url)}>
+                              Copy Direct Link
+                            </button>
+                            <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => setActiveTab('statistics')}>
+                              View Statistics
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* How to use Direct Link section */}
+                  <div className="glass-panel" style={{ padding: '24px' }}>
+                    <h4 style={{ marginBottom: '12px' }}>How to use SmartLink</h4>
+                    <p style={{ fontSize: '13px', color: '#9ca3af', lineHeight: 1.6, marginBottom: '20px' }}>
+                      Copy the link and use it wherever you see fit. Link it to items on your website, landing page, or send traffic directly from social media platforms (Facebook, Telegram channels, X tweets).
+                    </p>
+                    
+                    <span style={{ fontSize: '13px', fontWeight: 'bold', display: 'block', marginBottom: '12px', color: '#a78bfa' }}>
+                      Cases — find out how publishers make profits with SmartLink
+                    </span>
+                    <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
+                      <li style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: '8px' }}>
+                        🔗 <strong>Learn the best ways to motivate users to interact with ads more</strong> <span style={{ color: '#9ca3af' }}>(Blog article)</span>
+                      </li>
+                      <li style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: '8px' }}>
+                        🔗 <strong>How to Turn Facebook into a Profit Machine</strong> <span style={{ color: '#9ca3af' }}>(Success story)</span>
+                      </li>
+                      <li>
+                        🔗 <strong>How high CPMs turned tweets into real profit</strong> <span style={{ color: '#9ca3af' }}>(Success story)</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                </div>
+              )}
+
+              {/* 5. PAYMENTS TAB */}
+              {activeTab === 'payments' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                  
+                  {/* Payout summaries */}
+                  <div className="glass-panel" style={{ padding: '24px' }}>
+                    <h3 style={{ marginBottom: '20px' }}>Payments & Earnings Overview</h3>
+                    <div className="grid-4">
+                      <div>
+                        <span style={{ fontSize: '11px', color: '#9ca3af' }}>Approved Balance</span>
+                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#10b981' }}>${parseFloat(profile.balance_usd).toFixed(2)}</div>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '11px', color: '#9ca3af' }}>Hold Balance</span>
+                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#fbbf24' }}>$0.00</div>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '11px', color: '#9ca3af' }}>Total Payouts</span>
+                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#fff' }}>
+                          ${withdrawals.filter(w => w.status === 'approved').reduce((acc, w) => acc + parseFloat(w.amount_usd), 0).toFixed(2)}
                         </div>
                       </div>
-
-                      {/* Mock Interactive video-box */}
-                      <div style={{ background: '#07050d', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', padding: '20px', textAlign: 'center', minHeight: '180px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                        <span style={{ fontSize: '12px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>Visual Explanation</span>
-                        {guideStep === 0 && (
-                          <div style={{ border: '2px dashed rgba(139,92,246,0.3)', borderRadius: '8px', padding: '15px', color: '#a78bfa' }}>
-                            <Plus size={28} style={{ margin: '0 auto 8px' }} />
-                            <span>Input Form Input URL</span>
-                          </div>
-                        )}
-                        {guideStep === 1 && (
-                          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '10px', fontSize: '10px', textAlign: 'left', fontFamily: 'monospace' }}>
-                            &lt;head&gt;<br />
-                            &nbsp;&nbsp;&lt;meta name="earnvictor-verification" content="ev_verify_token..." /&gt;<br />
-                            &lt;/head&gt;
-                          </div>
-                        )}
-                        {guideStep === 2 && (
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                            <CheckCircle size={32} color="#10b981" />
-                            <span style={{ color: '#10b981', fontSize: '13px', fontWeight: 'bold' }}>Status: Verified</span>
-                          </div>
-                        )}
+                      <div>
+                        <span style={{ fontSize: '11px', color: '#9ca3af' }}>Minimum Limit</span>
+                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#a78bfa' }}>$5.00</div>
                       </div>
                     </div>
                   </div>
-                )}
 
-                {/* TAB 1: PROPERTIES & ZONES */}
-                {selectedProperty ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                  {/* Payment request options form */}
+                  <div className="glass-panel" style={{ padding: '24px' }}>
+                    <h3 style={{ marginBottom: '15px' }}>Request Withdrawal</h3>
                     
-                    {/* Add property & list panel */}
-                    <div className="glass-panel" style={{ padding: '24px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                        <h3>Manage Properties</h3>
-                        <div style={{ display: 'flex', gap: '10px' }}>
-                          <select 
-                            className="form-control" 
-                            style={{ padding: '6px 12px', fontSize: '13px' }}
-                            value={selectedProperty.id} 
-                            onChange={(e) => {
-                              const found = properties.find(p => p.id === e.target.value);
-                              setSelectedProperty(found);
-                              fetchZones(found.id);
-                            }}
-                          >
-                            {properties.map(p => (
-                              <option key={p.id} value={p.id}>{p.name} ({p.type})</option>
-                            ))}
-                          </select>
-                        </div>
+                    {withdrawMsg.text && (
+                      <div className={`badge badge-${withdrawMsg.type === 'success' ? 'verified' : 'rejected'}`} style={{ width: '100%', padding: '10px', marginBottom: '20px', textTransform: 'none', justifyContent: 'center' }}>
+                        {withdrawMsg.text}
                       </div>
+                    )}
 
-                      {/* Details of selected property */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '20px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div>
-                            <span style={{ fontSize: '12px', color: '#9ca3af' }}>Domain / App URL</span>
-                            <div style={{ fontSize: '18px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              {selectedProperty.url}
-                              <span className={`badge badge-${selectedProperty.status}`}>
-                                {selectedProperty.status}
-                              </span>
-                            </div>
-                          </div>
-                          {selectedProperty.status !== 'verified' && (
-                            <button 
-                              className="btn btn-emerald" 
-                              onClick={() => handleVerifyProperty(selectedProperty.id, selectedProperty.url)}
-                              style={{ padding: '8px 16px', fontSize: '13px' }}
-                            >
-                              <RefreshCw size={14} /> Verify Ownership
-                            </button>
-                          )}
-                        </div>
-
-                        {selectedProperty.status !== 'verified' && (
-                          <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                            <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#a78bfa', display: 'block', marginBottom: '8px' }}>
-                              Verification Instructions
-                            </span>
-                            <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '12px' }}>
-                              To verify ownership and start running ads, paste the following tag inside the <code>&lt;head&gt;</code> section of your HTML index file:
-                            </p>
-                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', background: '#0a0814', padding: '12px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                              <code style={{ fontSize: '12px', color: '#34d399', wordBreak: 'break-all', flex: 1 }}>
-                                {`<meta name="earnvictor-verification" content="${selectedProperty.verification_token}" />`}
-                              </code>
-                              <button 
-                                className="btn btn-secondary" 
-                                style={{ padding: '6px 10px', fontSize: '12px', flexShrink: 0 }}
-                                onClick={() => copyToClipboard(`<meta name="earnvictor-verification" content="${selectedProperty.verification_token}" />`)}
-                              >
-                                {copiedToken ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
-                              </button>
-                            </div>
-                          </div>
-                        )}
+                    <form onSubmit={handleRequestWithdrawal} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px', marginBottom: '20px' }}>
+                      <div className="form-group">
+                        <label className="form-label">Withdrawal Amount ($ USD)</label>
+                        <input type="number" step="0.01" className="form-control" placeholder="0.00" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} required />
                       </div>
+                      <div className="form-group">
+                        <label className="form-label">Withdrawal Method</label>
+                        <select className="form-control" value={withdrawMethod} onChange={e => setWithdrawMethod(e.target.value)}>
+                          <option value="PayPal">PayPal (Min $5)</option>
+                          <option value="Cryptocurrencies">Crypto (Min $100)</option>
+                          <option value="Skrill">Skrill (Min €5)</option>
+                          <option value="Webmoney">Webmoney (Min $5)</option>
+                          <option value="Payoneer">Payoneer (Min $20)</option>
+                          <option value="Wire">Wire Bank (Min $500)</option>
+                          <option value="Revolut">Revolut (Min $500)</option>
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Target Currency</label>
+                        <select className="form-control" value={withdrawCurrency} onChange={e => setWithdrawCurrency(e.target.value)}>
+                          <option value="USD">USD ($)</option>
+                          <option value="INR">INR (₹)</option>
+                        </select>
+                      </div>
+                    </form>
+
+                    <div className="form-group">
+                      <label className="form-label">Payment Account Details (Bank info, UPI ID, or Wallet address)</label>
+                      <textarea className="form-control" rows="2" placeholder="e.g. PayPal email ID, bank details, or UPI address..." value={withdrawDetails} onChange={e => setWithdrawDetails(e.target.value)} required />
                     </div>
 
-                    {/* Zone list & zone creator */}
-                    <div className="glass-panel" style={{ padding: '24px' }}>
-                      <h3 style={{ marginBottom: '20px' }}>Ad Zones for {selectedProperty.name}</h3>
+                    <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '10px' }}>
+                      Submit Payout Request
+                    </button>
+                  </div>
 
-                      {selectedProperty.status !== 'verified' ? (
-                        <div style={{ textAlign: 'center', padding: '40px', background: 'rgba(0,0,0,0.1)', borderRadius: '12px' }}>
-                          <Lock size={32} style={{ color: 'var(--accent-amber)', marginBottom: '12px' }} />
-                          <p style={{ color: '#9ca3af', fontSize: '14px' }}>
-                            Please verify ownership of this site or application to create ad placement codes.
+                  {/* Payment Options Details tabs (mimics the Monetag layout) */}
+                  <div className="glass-panel" style={{ padding: '24px' }}>
+                    <h3 style={{ marginBottom: '20px' }}>Available Payout Gateways</h3>
+                    
+                    {/* Method Selector Tabs */}
+                    <div style={{ display: 'flex', gap: '10px', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '12px', marginBottom: '20px', overflowX: 'auto' }}>
+                      {['cryptocurrencies', 'paypal', 'skrill', 'webmoney', 'payoneer', 'wire', 'revolut'].map(method => (
+                        <button 
+                          key={method} 
+                          className="btn" 
+                          type="button"
+                          onClick={() => setSelectedPaymentMethodTab(method)}
+                          style={{ 
+                            padding: '6px 12px', 
+                            fontSize: '12px', 
+                            background: selectedPaymentMethodTab === method ? 'rgba(139, 92, 246, 0.1)' : 'transparent',
+                            borderColor: selectedPaymentMethodTab === method ? '#8b5cf6' : 'rgba(255,255,255,0.05)',
+                            border: '1px solid',
+                            color: selectedPaymentMethodTab === method ? '#fff' : '#9ca3af'
+                          }}
+                        >
+                          {method.toUpperCase()}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Method Description Card */}
+                    <div className="glass-card" style={{ background: 'rgba(255,255,255,0.01)', padding: '20px' }}>
+                      {selectedPaymentMethodTab === 'cryptocurrencies' && (
+                        <div>
+                          <h4 style={{ color: '#fff', marginBottom: '8px' }}>Cryptocurrencies Payouts</h4>
+                          <p style={{ color: '#9ca3af', fontSize: '13px', lineHeight: 1.5 }}>
+                            Receive earnings in Bitcoin, USDT TRC20, USDT ERC20, USDT BEP20, or Toncoin (TON) through a licensed payment service provider (e.g., CoinsPaid or similar).<br /><br />
+                            <strong>Minimum payout:</strong> $100 USD<br />
+                            <strong>Fees:</strong> Exchange platform network fees apply.
                           </p>
                         </div>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
-                          
-                          {/* Create Zone Form */}
-                          <form onSubmit={handleCreateZone} style={{ display: 'grid', gridTemplateColumns: '1fr 200px auto', gap: '15px', alignItems: 'end' }}>
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                              <label className="form-label">Zone Name</label>
-                              <input 
-                                type="text" 
-                                className="form-control" 
-                                placeholder="e.g. Header Popunder, Side Banner" 
-                                value={newZoneName} 
-                                onChange={e => setNewZoneName(e.target.value)} 
-                                required 
-                              />
-                            </div>
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                              <label className="form-label">Ad Type</label>
-                              <select 
-                                className="form-control" 
-                                value={newZoneType} 
-                                onChange={e => setNewZoneType(e.target.value)}
-                              >
-                                <option value="smartlink">SmartLink</option>
-                                <option value="popunder">Popunder</option>
-                                <option value="banner">Banner Placement</option>
-                                <option value="video">Auto-Video ad</option>
-                              </select>
-                            </div>
-                            <button type="submit" className="btn btn-primary" style={{ padding: '12px 24px' }}>
-                              <Plus size={16} /> Create Code
-                            </button>
-                          </form>
-
-                          {/* Zones List */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                            {zones.length === 0 ? (
-                              <p style={{ color: '#9ca3af', fontSize: '14px', textAlign: 'center' }}>No ad zones generated yet. Create one above.</p>
-                            ) : (
-                              zones.map(zone => (
-                                <div key={zone.id} className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: 'rgba(255,255,255,0.01)' }}>
-                                  <div>
-                                    <h4 style={{ fontSize: '15px', color: '#fff' }}>{zone.name}</h4>
-                                    <span style={{ fontSize: '12px', color: '#9ca3af' }}>Type: {zone.type.toUpperCase()} | Base CPM: ${parseFloat(zone.cpm_rate).toFixed(2)}</span>
-                                  </div>
-                                  <div>
-                                    <button 
-                                      className="btn btn-secondary" 
-                                      style={{ padding: '6px 12px', fontSize: '12px' }}
-                                      onClick={() => {
-                                        const code = `<script src="http://localhost:8000/api/ad-serve?zone_id=${zone.id}" data-zone="${zone.id}"></script>`;
-                                        copyToClipboard(code);
-                                        alert("Integration script copied! Paste it in your HTML.");
-                                      }}
-                                    >
-                                      Copy Tag Script
-                                    </button>
-                                  </div>
-                                </div>
-                              ))
-                            )}
-                          </div>
+                      )}
+                      {selectedPaymentMethodTab === 'paypal' && (
+                        <div>
+                          <h4 style={{ color: '#fff', marginBottom: '8px' }}>PayPal Transfers</h4>
+                          <p style={{ color: '#9ca3af', fontSize: '13px', lineHeight: 1.5 }}>
+                            Instant payment directly to your registered PayPal email account in USD.<br /><br />
+                            <strong>Minimum payout:</strong> $5 USD<br />
+                            <strong>Fees:</strong> None.
+                          </p>
+                        </div>
+                      )}
+                      {selectedPaymentMethodTab === 'skrill' && (
+                        <div>
+                          <h4 style={{ color: '#fff', marginBottom: '8px' }}>Skrill Wallet</h4>
+                          <p style={{ color: '#9ca3af', fontSize: '13px', lineHeight: 1.5 }}>
+                            Instant payment in EUR only.<br /><br />
+                            <strong>Minimum payout:</strong> €5 EUR<br />
+                            <strong>Verification:</strong> Required to complete KYC checks.
+                          </p>
+                        </div>
+                      )}
+                      {selectedPaymentMethodTab === 'webmoney' && (
+                        <div>
+                          <h4 style={{ color: '#fff', marginBottom: '8px' }}>Webmoney Transfer</h4>
+                          <p style={{ color: '#9ca3af', fontSize: '13px', lineHeight: 1.5 }}>
+                            Instant payment in USD to WMZ or WMT wallets.<br /><br />
+                            <strong>Minimum payout:</strong> $5 USD<br />
+                            <strong>Verification:</strong> Required to complete KYC.
+                          </p>
+                        </div>
+                      )}
+                      {selectedPaymentMethodTab === 'payoneer' && (
+                        <div>
+                          <h4 style={{ color: '#fff', marginBottom: '8px' }}>Payoneer Account</h4>
+                          <p style={{ color: '#9ca3af', fontSize: '13px', lineHeight: 1.5 }}>
+                            Direct bank card transfer in USD.<br /><br />
+                            <strong>Minimum payout:</strong> $20 USD<br />
+                            <strong>Availability:</strong> Unlocked when balance exceeds $30.
+                          </p>
+                        </div>
+                      )}
+                      {selectedPaymentMethodTab === 'wire' && (
+                        <div>
+                          <h4 style={{ color: '#fff', marginBottom: '8px' }}>Regular Bank Wire</h4>
+                          <p style={{ color: '#9ca3af', fontSize: '13px', lineHeight: 1.5 }}>
+                            Regular bank transactions with 3-5 business days processing delay. Transfers in USD or EUR.<br /><br />
+                            <strong>Minimum payout:</strong> $500 USD<br />
+                            <strong>Fees:</strong> Transfers below $1000 incur a standard bank handling fee of $50.
+                          </p>
+                        </div>
+                      )}
+                      {selectedPaymentMethodTab === 'revolut' && (
+                        <div>
+                          <h4 style={{ color: '#fff', marginBottom: '8px' }}>Revolut Account</h4>
+                          <p style={{ color: '#9ca3af', fontSize: '13px', lineHeight: 1.5 }}>
+                            For Revolut account holders. Standard transactions with 3-5 days delivery. Transfers in USD/EUR.<br /><br />
+                            <strong>Minimum payout:</strong> $500 USD<br />
+                            <strong>Fees:</strong> Wire transactions under $1000 carry a $50 bank commission fee.
+                          </p>
                         </div>
                       )}
                     </div>
+                  </div>
 
-                    {/* Form to add a new site */}
-                    <div className="glass-panel" style={{ padding: '24px' }}>
-                      <h3 style={{ marginBottom: '20px' }}>Add Another Website or App</h3>
-                      <form onSubmit={handleAddProperty} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 180px auto', gap: '15px', alignItems: 'end' }}>
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                          <label className="form-label">Property Name</label>
-                          <input 
-                            type="text" 
-                            className="form-control" 
-                            placeholder="e.g. My Arcade Game" 
-                            value={newPropName} 
-                            onChange={e => setNewPropName(e.target.value)} 
-                            required 
-                          />
+                  {/* Transaction logs */}
+                  <div className="glass-panel" style={{ padding: '24px' }}>
+                    <h3 style={{ marginBottom: '15px' }}>Payout Transaction History</h3>
+                    {withdrawals.length === 0 ? (
+                      <p style={{ color: '#9ca3af', fontSize: '13px', textAlign: 'center' }}>No payments recorded yet.</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {withdrawals.map(w => (
+                          <div key={w.id} className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: 'rgba(255,255,255,0.01)' }}>
+                            <div>
+                              <h4 style={{ fontSize: '14px' }}>
+                                {w.currency === 'INR' ? `₹${parseFloat(w.amount_local).toFixed(2)} INR` : `$${parseFloat(w.amount_usd).toFixed(2)} USD`}
+                              </h4>
+                              <span style={{ fontSize: '11px', color: '#9ca3af' }}>Gateway: {w.payment_method} | Date: {new Date(w.created_at).toLocaleDateString()}</span>
+                            </div>
+                            <span className={`badge badge-${w.status}`}>{w.status}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              )}
+
+              {/* 6. INSIGHTS TAB */}
+              {activeTab === 'insights' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                  <div className="glass-panel" style={{ padding: '24px' }}>
+                    <h2 style={{ marginBottom: '15px', fontSize: '24px' }}>Essential Monetization Guides & Insights</h2>
+                    <p style={{ color: '#9ca3af', marginBottom: '24px', fontSize: '14px' }}>
+                      Learn how to turn your website into a monetization powerhouse with all the essential monetization information and guides.
+                    </p>
+
+                    {/* Onboarding Videos accordion layout */}
+                    <h3 style={{ fontSize: '18px', marginBottom: '15px', color: '#a78bfa' }}>Video Instructions</h3>
+                    <div className="grid-2" style={{ marginBottom: '30px' }}>
+                      <div className="glass-card" style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                        <div style={{ background: 'rgba(139,92,246,0.1)', padding: '15px', borderRadius: '12px' }}>
+                          <Play size={24} color="#8b5cf6" />
                         </div>
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                          <label className="form-label">Homepage URL</label>
-                          <input 
-                            type="text" 
-                            className="form-control" 
-                            placeholder="e.g. game.mywebsite.com" 
-                            value={newPropUrl} 
-                            onChange={e => setNewPropUrl(e.target.value)} 
-                            required 
-                          />
+                        <div>
+                          <h4 style={{ fontSize: '14px' }}>Onboarding video</h4>
+                          <span style={{ fontSize: '11px', color: '#9ca3af' }}>Learn how to set up your account</span>
                         </div>
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                          <label className="form-label">Property Type</label>
-                          <select 
-                            className="form-control" 
-                            value={newPropType} 
-                            onChange={e => setNewPropType(e.target.value)}
-                          >
-                            <option value="website">Website</option>
-                            <option value="app">Mobile App</option>
-                            <option value="mini_game">Mini Game</option>
-                            <option value="telegram_bot">Telegram Bot</option>
-                            <option value="apk">Android APK</option>
-                          </select>
+                      </div>
+                      <div className="glass-card" style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                        <div style={{ background: 'rgba(16,185,129,0.1)', padding: '15px', borderRadius: '12px' }}>
+                          <Play size={24} color="#10b981" />
                         </div>
-                        <button type="submit" className="btn btn-primary" style={{ padding: '12px 20px' }}>
-                          Add Property
-                        </button>
-                      </form>
+                        <div>
+                          <h4 style={{ fontSize: '14px' }}>Tag installation guide</h4>
+                          <span style={{ fontSize: '11px', color: '#9ca3af' }}>Learn where to copy-paste scripts</span>
+                        </div>
+                      </div>
                     </div>
 
-                  </div>
-                ) : (
-                  
-                  /* TAB 2: WALLET & payout requests */
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
-                    
-                    {/* Wallet balance cards */}
-                    <div className="grid-2">
-                      <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <span style={{ fontSize: '13px', color: '#9ca3af', fontWeight: 600 }}>USD Account Balance</span>
-                        <div style={{ fontSize: '36px', fontWeight: 800, color: 'var(--accent-emerald)' }}>
-                          ${parseFloat(profile.balance_usd).toFixed(4)} USD
+                    {/* Educational Formats list */}
+                    <h3 style={{ fontSize: '18px', marginBottom: '15px' }}>Ad Formats Explanation</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                      {[
+                        { title: 'SmartLink: Easy and Profitable Traffic Monetization', desc: 'Direct redirect links optimized for highest conversion rates.' },
+                        { title: 'Popunder (Onclick): Your Monetization Format with REALLY High CPM', desc: 'Maximum CPM popup ad placements firing in background pages.' },
+                        { title: 'In-Page Push: Monetize broadest audience, including iOS users', desc: 'Native push notifications that float cleanly on mobile browsers.' },
+                        { title: 'MultiTag: What Is It?', desc: 'A multi-ad-format tag that serves Popunders, banners, and push automatically.' },
+                        { title: 'Vignette Banner: Native Monetization Format With BURNING Performance', desc: 'A native interstitial vignette ad displaying on page transitions.' },
+                        { title: 'Push Notifications: Make additional profit with a well-known monetization format', desc: 'Subscribes readers to clean notification feeds for continuous revenue.' }
+                      ].map((format, idx) => (
+                        <div key={idx} className="glass-card" style={{ background: 'rgba(255,255,255,0.01)', padding: '16px' }}>
+                          <h4 style={{ fontSize: '14px', marginBottom: '4px', color: '#fff' }}>{format.title}</h4>
+                          <p style={{ fontSize: '12px', color: '#9ca3af' }}>{format.desc}</p>
                         </div>
-                        <span style={{ fontSize: '12px', color: '#9ca3af' }}>Minimum withdrawal threshold: $5.00 USD</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 7. REFERRAL TAB */}
+              {activeTab === 'referral' && (
+                <div className="glass-panel" style={{ padding: '30px' }}>
+                  <h2>Referral Program</h2>
+                  <p style={{ color: 'var(--text-secondary)', margin: '15px 0 24px', fontSize: '14px' }}>
+                    Invite new publishers to EarnVictor and receive a lifetime commission of 5% of their gross earnings.
+                  </p>
+                  
+                  <div className="glass-card" style={{ background: 'rgba(255,255,255,0.01)' }}>
+                    <span style={{ fontSize: '12px', color: '#9ca3af' }}>Your Unique Referral Link</span>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '10px' }}>
+                      <input type="text" className="form-control" readOnly value={`https://earnvictor.com/ref?id=${user.id}`} style={{ flex: 1 }} />
+                      <button className="btn btn-primary" onClick={() => { copyToClipboard(`https://earnvictor.com/ref?id=${user.id}`); alert("Referral link copied!"); }}>
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 8. PRIORITY PROGRAM TAB */}
+              {activeTab === 'priority' && (
+                <div className="glass-panel" style={{ padding: '30px' }}>
+                  <h2>Priority Club</h2>
+                  <p style={{ color: 'var(--text-secondary)', margin: '15px 0 24px', fontSize: '14px' }}>
+                    Achieve higher monthly traffic counts to unlock prioritized payouts, dedicated manager support, and exclusive custom ad tags.
+                  </p>
+                  <div className="grid-3">
+                    <div className="glass-card" style={{ opacity: 0.6 }}>
+                      <h3>Silver Tier</h3>
+                      <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '8px' }}>Requires $500 monthly revenue share. 24h payout cycles.</p>
+                    </div>
+                    <div className="glass-card" style={{ opacity: 0.6 }}>
+                      <h3>Gold Tier</h3>
+                      <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '8px' }}>Requires $2000 monthly revenue share. Priority domain checks.</p>
+                    </div>
+                    <div className="glass-card" style={{ opacity: 0.6 }}>
+                      <h3>VIP Tier</h3>
+                      <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '8px' }}>Requires $5000 monthly revenue share. 0% withdrawal commissions.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 9. HELP CENTER TAB */}
+              {activeTab === 'help_center' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                  <div className="glass-panel" style={{ padding: '30px', textAlign: 'center' }}>
+                    <h2 style={{ marginBottom: '10px' }}>Advice and answers from the EarnVictor Team</h2>
+                    <p style={{ color: '#9ca3af', fontSize: '13px', marginBottom: '24px' }}>Search or browse troubleshooting topics below.</p>
+                    
+                    <div style={{ position: 'relative', maxWidth: '600px', margin: '0 auto 30px' }}>
+                      <input 
+                        type="text" 
+                        className="form-control" 
+                        placeholder="Search for articles..." 
+                        style={{ paddingLeft: '40px', fontSize: '14px' }}
+                        value={helpSearchQuery}
+                        onChange={e => setHelpSearchQuery(e.target.value)}
+                      />
+                      <Search size={18} style={{ position: 'absolute', left: '14px', top: '15px', color: '#9ca3af' }} />
+                    </div>
+
+                    <div className="grid-3" style={{ textAlign: 'left' }}>
+                      {[
+                        { title: 'General Support', count: '14 articles' },
+                        { title: 'Ad Formats Setup', count: '6 articles' },
+                        { title: 'Account Settings', count: '4 articles' },
+                        { title: 'Payments & Finances', count: '12 articles' },
+                        { title: 'WordPress Plugin', count: '6 articles' },
+                        { title: 'Troubleshooting FAQ', count: '9 articles' }
+                      ].map((cat, idx) => (
+                        <div key={idx} className="glass-card" style={{ cursor: 'pointer' }}>
+                          <h4 style={{ color: '#fff', fontSize: '15px', marginBottom: '5px' }}>{cat.title}</h4>
+                          <span style={{ fontSize: '12px', color: '#9ca3af' }}>{cat.count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 10. DONATE TAB */}
+              {activeTab === 'donate' && (
+                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  <div className="glass-panel" style={{ padding: '40px', maxWidth: '550px', width: '100%', textAlign: 'center', border: '1px solid rgba(251, 191, 36, 0.3)' }}>
+                    <div style={{ background: 'rgba(251, 191, 36, 0.1)', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                      <DollarSign size={32} color="#fbbf24" />
+                    </div>
+                    <h2 style={{ fontSize: '28px', marginBottom: '12px' }}>Support EarnVictor Platform</h2>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: 1.6, marginBottom: '24px' }}>
+                      We are building a clean, transparent, and secure ad network with the lowest platform commissions. Support our hosting and developer costs to help us keep payouts high for everyone!
+                    </p>
+
+                    <div className="glass-card" style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '24px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '24px' }}>
+                      <span style={{ fontSize: '12px', color: '#fbbf24', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>Direct UPI Donation</span>
+                      <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#fff', margin: '12px 0 6px', wordBreak: 'break-all' }}>
+                        arasu9629hf@okhdfcbank
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        Minimum: ₹50 | Maximum: Unlimited
                       </div>
                       
-                      <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <span style={{ fontSize: '13px', color: '#9ca3af', fontWeight: 600 }}>INR Account Balance</span>
-                        <div style={{ fontSize: '36px', fontWeight: 800, color: 'var(--accent-purple)' }}>
-                          ₹{(parseFloat(profile.balance_usd) * usdToInrRate).toFixed(2)} INR
-                        </div>
-                        <span style={{ fontSize: '12px', color: '#9ca3af' }}>1 USD = {usdToInrRate.toFixed(2)} INR (Dynamic conversion)</span>
-                      </div>
-                    </div>
-
-                    {/* Withdrawal Request Form */}
-                    <div className="glass-panel" style={{ padding: '24px' }}>
-                      <h3 style={{ marginBottom: '20px' }}>Request Balance Withdrawal</h3>
-
-                      {withdrawMsg.text && (
-                        <div className={`badge badge-${withdrawMsg.type === 'success' ? 'verified' : 'rejected'}`} style={{ width: '100%', padding: '10px', marginBottom: '20px', borderRadius: '6px', textTransform: 'none', justifyContent: 'center' }}>
-                          {withdrawMsg.text}
-                        </div>
-                      )}
-
-                      <form onSubmit={handleRequestWithdrawal} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '20px' }}>
-                        <div className="form-group">
-                          <label className="form-label">Withdraw Amount (USD)</label>
-                          <input 
-                            type="number" 
-                            step="0.0001"
-                            className="form-control" 
-                            placeholder="0.00" 
-                            value={withdrawAmount} 
-                            onChange={e => setWithdrawAmount(e.target.value)} 
-                            required 
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label className="form-label">Withdrawal Currency</label>
-                          <select 
-                            className="form-control" 
-                            value={withdrawCurrency} 
-                            onChange={e => setWithdrawCurrency(e.target.value)}
-                          >
-                            <option value="USD">USD ($)</option>
-                            <option value="INR">INR (₹)</option>
-                          </select>
-                        </div>
-                        <div className="form-group">
-                          <label className="form-label">Payment Mode</label>
-                          <select 
-                            className="form-control" 
-                            value={withdrawMethod} 
-                            onChange={e => setWithdrawMethod(e.target.value)}
-                          >
-                            <option value="Bank Transfer">Local Bank Transfer</option>
-                            <option value="UPI">UPI (India)</option>
-                            <option value="PayPal">PayPal</option>
-                            <option value="USDT">Crypto USDT</option>
-                          </select>
-                        </div>
-                      </form>
-
-                      <div className="form-group">
-                        <label className="form-label">Account details (Bank account/UPI id/Email info)</label>
-                        <textarea 
-                          className="form-control" 
-                          rows="3" 
-                          placeholder="e.g. Bank name, Account number, IFSC code or UPI ID details..." 
-                          value={withdrawDetails} 
-                          onChange={e => setWithdrawDetails(e.target.value)}
-                          required
-                        />
-                      </div>
-
-                      <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '10px' }}>
-                        Submit Withdrawal Request
+                      <button 
+                        type="button" 
+                        className="btn btn-secondary" 
+                        style={{ marginTop: '16px', width: '100%', fontSize: '13px' }}
+                        onClick={() => {
+                          navigator.clipboard.writeText("arasu9629hf@okhdfcbank");
+                          alert("UPI ID copied to clipboard!");
+                        }}
+                      >
+                        Copy UPI ID
                       </button>
                     </div>
 
-                    {/* Withdrawal logs */}
-                    <div className="glass-panel" style={{ padding: '24px' }}>
-                      <h3 style={{ marginBottom: '20px' }}>Transaction History</h3>
-                      {withdrawals.length === 0 ? (
-                        <p style={{ color: '#9ca3af', fontSize: '14px', textAlign: 'center' }}>No withdrawals recorded yet.</p>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                          {withdrawals.map(w => (
-                            <div key={w.id} className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: 'rgba(255,255,255,0.01)' }}>
-                              <div>
-                                <h4 style={{ fontSize: '15px' }}>
-                                  {w.currency === 'INR' ? `₹${parseFloat(w.amount_local).toFixed(2)} INR` : `$${parseFloat(w.amount_usd).toFixed(4)} USD`}
-                                </h4>
-                                <span style={{ fontSize: '12px', color: '#9ca3af' }}>Method: {w.payment_method} | Date: {new Date(w.created_at).toLocaleDateString()}</span>
-                              </div>
-                              <span className={`badge badge-${w.status}`}>
-                                {w.status}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left', background: 'rgba(255,255,255,0.01)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'start', fontSize: '13px' }}>
+                        <CheckCircle size={16} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
+                        <span>Your support directly funds verification API servers and server hosting costs.</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'start', fontSize: '13px' }}>
+                        <CheckCircle size={16} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
+                        <span>Allows us to lower the owner commission rate even further!</span>
+                      </div>
                     </div>
-
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+
             </div>
+
           </div>
         )}
 
@@ -1384,21 +1708,13 @@ export default function App() {
                           </div>
                           
                           <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                            <button 
-                              className="btn btn-secondary" 
-                              style={{ padding: '6px 12px', fontSize: '12px' }}
-                              onClick={() => {
-                                const reason = prompt("Enter rejection reason:");
-                                if (reason) handleRejectProperty(prop.id, reason);
-                              }}
-                            >
+                            <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => {
+                              const reason = prompt("Enter rejection reason:");
+                              if (reason) handleRejectProperty(prop.id, reason);
+                            }}>
                               Reject
                             </button>
-                            <button 
-                              className="btn btn-emerald" 
-                              style={{ padding: '6px 12px', fontSize: '12px' }}
-                              onClick={() => handleApproveProperty(prop.id)}
-                            >
+                            <button className="btn btn-emerald" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => handleApproveProperty(prop.id)}>
                               Approve / Verify
                             </button>
                           </div>
@@ -1431,18 +1747,10 @@ export default function App() {
                           </div>
                           
                           <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                            <button 
-                              className="btn btn-secondary" 
-                              style={{ padding: '6px 12px', fontSize: '12px' }}
-                              onClick={() => handleRejectWithdrawal(wd)}
-                            >
+                            <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => handleRejectWithdrawal(wd)}>
                               Reject & Refund
                             </button>
-                            <button 
-                              className="btn btn-emerald" 
-                              style={{ padding: '6px 12px', fontSize: '12px' }}
-                              onClick={() => handleApproveWithdrawal(wd.id)}
-                            >
+                            <button className="btn btn-emerald" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => handleApproveWithdrawal(wd.id)}>
                               Confirm Payment
                             </button>
                           </div>
@@ -1461,29 +1769,13 @@ export default function App() {
                 <form onSubmit={handleUpdateRates} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   <div className="form-group">
                     <label className="form-label">USD to INR Exchange Rate (₹)</label>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      className="form-control" 
-                      value={usdToInrRate} 
-                      onChange={e => setUsdToInrRate(parseFloat(e.target.value))} 
-                      required 
-                    />
+                    <input type="number" step="0.01" className="form-control" value={usdToInrRate} onChange={e => setUsdToInrRate(parseFloat(e.target.value))} required />
                     <span style={{ fontSize: '11px', color: '#9ca3af' }}>Used to calculate local currency payouts dynamically</span>
                   </div>
 
                   <div className="form-group">
                     <label className="form-label">Platform Commission Rate</label>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      min="0.0" 
-                      max="1.0" 
-                      className="form-control" 
-                      value={ownerCommissionRate} 
-                      onChange={e => setOwnerCommissionRate(parseFloat(e.target.value))} 
-                      required 
-                    />
+                    <input type="number" step="0.01" min="0.0" max="1.0" className="form-control" value={ownerCommissionRate} onChange={e => setOwnerCommissionRate(parseFloat(e.target.value))} required />
                     <span style={{ fontSize: '11px', color: '#9ca3af' }}>e.g. 0.20 = 20% commission routed to owner account</span>
                   </div>
 
@@ -1547,63 +1839,6 @@ export default function App() {
               <p>EarnVictor respects copyright laws and operates in full compliance with the Digital Millennium Copyright Act. We mandate that all connected apps, websites, and APKs monetizing through our network represent original or fully-licensed intellectual property.</p>
               <h3>Filing a Copyright Takedown</h3>
               <p>If you identify properties running ads on our network that infringe on your copyright, submit a formal claim including the property URL, proof of ownership, and signature to our support mail. We execute review checks within 48 hours.</p>
-            </div>
-          </div>
-        )}
-
-        {/* PAGE: DONATE SECTION */}
-        {currentPage === 'donate' && (
-          <div style={{ display: 'flex', justifyContent: 'center', margin: '40px 0' }}>
-            <div className="glass-panel" style={{ padding: '40px', maxWidth: '500px', width: '100%', textAlign: 'center', border: '1px solid rgba(251, 191, 36, 0.3)' }}>
-              <div style={{ background: 'rgba(251, 191, 36, 0.1)', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-                <DollarSign size={32} color="#fbbf24" />
-              </div>
-              <h2 style={{ fontSize: '28px', marginBottom: '12px' }}>Support EarnVictor</h2>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: 1.6, marginBottom: '24px' }}>
-                We are building a clean, transparent, and secure ad network with the lowest platform commissions. Support our hosting and developer costs to help us keep payouts high for everyone!
-              </p>
-
-              <div className="glass-card" style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '24px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '24px' }}>
-                <span style={{ fontSize: '12px', color: '#fbbf24', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>Direct UPI Donation</span>
-                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#fff', margin: '12px 0 6px', wordBreak: 'break-all' }}>
-                  arasu9629hf@okhdfcbank
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                  Minimum: ₹50 | Maximum: Unlimited
-                </div>
-                
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
-                  style={{ marginTop: '16px', width: '100%', fontSize: '13px' }}
-                  onClick={() => {
-                    navigator.clipboard.writeText("arasu9629hf@okhdfcbank");
-                    alert("UPI ID copied to clipboard!");
-                  }}
-                >
-                  Copy UPI ID
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left', background: 'rgba(255,255,255,0.01)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'start', fontSize: '13px' }}>
-                  <CheckCircle size={16} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
-                  <span>Your support directly funds verification API servers and server hosting costs.</span>
-                </div>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'start', fontSize: '13px' }}>
-                  <CheckCircle size={16} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
-                  <span>Allows us to lower the owner commission rate even further!</span>
-                </div>
-              </div>
-
-              <button 
-                type="button" 
-                className="btn btn-primary" 
-                style={{ width: '100%', marginTop: '24px' }} 
-                onClick={() => setCurrentPage('home')}
-              >
-                Return to Home
-              </button>
             </div>
           </div>
         )}
