@@ -79,6 +79,13 @@ export default function App() {
   const [withdrawMsg, setWithdrawMsg] = useState({ type: '', text: '' });
   const [selectedPaymentMethodTab, setSelectedPaymentMethodTab] = useState('cryptocurrencies');
 
+  // Subscription States
+  const [publisherSubscriptions, setPublisherSubscriptions] = useState([]);
+  const [allSubscriptions, setAllSubscriptions] = useState([]);
+  const [showSubModal, setShowSubModal] = useState(false);
+  const [selectedSubPlan, setSelectedSubPlan] = useState(null);
+  const [subUtrId, setSubUtrId] = useState('');
+
   // Stats filter & data
   const [statsFormatFilter, setStatsFormatFilter] = useState('all');
   const [statsDateRange, setStatsDateRange] = useState('month');
@@ -279,6 +286,10 @@ export default function App() {
         ];
         setCustomStatsList(dummyStats);
       }
+
+      // 4. Fetch publisher subscriptions
+      const { data: subs } = await supabase.table('subscriptions').select('*').eq('publisher_id', user.id).order('created_at', { ascending: false });
+      setPublisherSubscriptions(subs || []);
 
     } catch (err) {
       console.error(err);
@@ -540,6 +551,10 @@ export default function App() {
         setTotalPlatformRev(totalRev);
         setTotalOwnerCommission(totalComm);
       }
+
+      const { data: subs } = await supabase.table('subscriptions').select('*, profiles(email)').order('created_at', { ascending: false });
+      setAllSubscriptions(subs || []);
+
     } catch (err) {
       console.error(err);
     }
@@ -612,6 +627,33 @@ export default function App() {
       }
 
       setOwnerMsg({ type: 'success', text: 'Withdrawal rejected and balance refunded.' });
+      fetchOwnerData();
+    } catch (err) {
+      setOwnerMsg({ type: 'error', text: err.message });
+    }
+  };
+
+  const handleApproveSubscription = async (subId) => {
+    try {
+      const { error } = await supabase.table('subscriptions').update({
+        status: 'approved',
+        activated_at: new Date().toISOString()
+      }).eq('id', subId);
+      if (error) throw error;
+      setOwnerMsg({ type: 'success', text: 'Subscription approved and activated!' });
+      fetchOwnerData();
+    } catch (err) {
+      setOwnerMsg({ type: 'error', text: err.message });
+    }
+  };
+
+  const handleRejectSubscription = async (subId) => {
+    try {
+      const { error } = await supabase.table('subscriptions').update({
+        status: 'rejected'
+      }).eq('id', subId);
+      if (error) throw error;
+      setOwnerMsg({ type: 'success', text: 'Subscription marked as rejected.' });
       fetchOwnerData();
     } catch (err) {
       setOwnerMsg({ type: 'error', text: err.message });
@@ -905,6 +947,9 @@ export default function App() {
                 </button>
                 <button className="btn" onClick={() => setActiveTab('priority')} style={{ justifyContent: 'flex-start', background: activeTab === 'priority' ? 'rgba(255,255,255,0.04)' : 'transparent', color: activeTab === 'priority' ? '#fff' : '#9ca3af', borderLeft: activeTab === 'priority' ? '3px solid #8b5cf6' : 'none', borderRadius: '0 8px 8px 0', width: '100%' }}>
                   <Award size={16} /> Priority Program
+                </button>
+                <button className="btn" onClick={() => setActiveTab('premium')} style={{ justifyContent: 'flex-start', background: activeTab === 'premium' ? 'rgba(255,255,255,0.04)' : 'transparent', color: activeTab === 'premium' ? '#fff' : '#9ca3af', borderLeft: activeTab === 'premium' ? '3px solid #10b981' : 'none', borderRadius: '0 8px 8px 0', width: '100%' }}>
+                  <Award size={16} color="#10b981" /> Premium Plans (Ads Free)
                 </button>
                 <button className="btn" onClick={() => setActiveTab('help_center')} style={{ justifyContent: 'flex-start', background: activeTab === 'help_center' ? 'rgba(255,255,255,0.04)' : 'transparent', color: activeTab === 'help_center' ? '#fff' : '#9ca3af', borderLeft: activeTab === 'help_center' ? '3px solid #8b5cf6' : 'none', borderRadius: '0 8px 8px 0', width: '100%' }}>
                   <HelpCircle size={16} /> Help Center
@@ -1567,6 +1612,125 @@ export default function App() {
                 </div>
               )}
 
+              {/* 9b. PREMIUM PLANS TAB (Ads Free & Weekly Referrals) */}
+              {activeTab === 'premium' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                  
+                  {/* Explanatory banner */}
+                  <div className="glass-panel" style={{ padding: '24px', background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08), transparent)', border: '1px solid rgba(16, 185, 129, 0.15)' }}>
+                    <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                      <Award size={36} color="#10b981" />
+                      <div>
+                        <h2 style={{ fontSize: '22px', color: '#fff', marginBottom: '4px' }}>EarnVictor Publisher Premium Upgrades</h2>
+                        <p style={{ color: '#9ca3af', fontSize: '13px' }}>Unlock higher conversion rates, zero platform ads, and maximum referral payouts.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Pricing grid */}
+                  <div className="grid-2">
+                    {/* Plan 1: Ads Free Pass */}
+                    <div className="glass-card" style={{ padding: '30px', display: 'flex', flexDirection: 'column', gap: '20px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div>
+                        <span className="badge badge-verified" style={{ fontSize: '10px' }}>MOST POPULAR</span>
+                        <h3 style={{ fontSize: '20px', color: '#fff', marginTop: '10px' }}>20 Days Ads-Free Pass</h3>
+                        <p style={{ color: '#9ca3af', fontSize: '12px', marginTop: '5px' }}>Monetize traffic without seeing any admin ads on your publisher control panel.</p>
+                      </div>
+                      
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                        <span style={{ fontSize: '32px', fontWeight: 800, color: '#fff' }}>₹149</span>
+                        <span style={{ color: '#9ca3af', fontSize: '13px' }}>/ 20 days</span>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '15px' }} />
+
+                      <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px', color: '#d1d5db' }}>
+                        <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <CheckCircle size={14} color="#10b981" /> 100% Ads-Free Publisher Interface
+                        </li>
+                        <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <CheckCircle size={14} color="#10b981" /> Unlimited Link Traffic routing
+                        </li>
+                        <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <CheckCircle size={14} color="#10b981" /> Custom Direct SmartLink generation
+                        </li>
+                      </ul>
+
+                      <button 
+                        className="btn btn-emerald" 
+                        style={{ width: '100%', marginTop: 'auto', padding: '12px' }}
+                        onClick={() => {
+                          setSelectedSubPlan({ name: '20 Days Ads-Free Pass', price: 149.00, duration: 20 });
+                          setShowSubModal(true);
+                        }}
+                      >
+                        Subscribe for ₹149
+                      </button>
+                    </div>
+
+                    {/* Plan 2: Referrals Booster */}
+                    <div className="glass-card" style={{ padding: '30px', display: 'flex', flexDirection: 'column', gap: '20px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div>
+                        <span className="badge badge-pending" style={{ fontSize: '10px', color: '#a78bfa', borderColor: '#a78bfa' }}>GROWTH BOOST</span>
+                        <h3 style={{ fontSize: '20px', color: '#fff', marginTop: '10px' }}>Weekly Referrals Booster</h3>
+                        <p style={{ color: '#9ca3af', fontSize: '12px', marginTop: '5px' }}>Triple your lifetime referral commission payouts from 5% to 15%.</p>
+                      </div>
+                      
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                        <span style={{ fontSize: '32px', fontWeight: 800, color: '#fff' }}>₹49</span>
+                        <span style={{ color: '#9ca3af', fontSize: '13px' }}>/ 1 week</span>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '15px' }} />
+
+                      <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px', color: '#d1d5db' }}>
+                        <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <CheckCircle size={14} color="#10b981" /> 15% Lifetime Referral cut (instead of 5%)
+                        </li>
+                        <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <CheckCircle size={14} color="#10b981" /> VIP Verification Support
+                        </li>
+                        <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <CheckCircle size={14} color="#10b981" /> Dedicated Admin Manager Channel
+                        </li>
+                      </ul>
+
+                      <button 
+                        className="btn btn-primary" 
+                        style={{ width: '100%', marginTop: 'auto', padding: '12px' }}
+                        onClick={() => {
+                          setSelectedSubPlan({ name: 'Weekly Referrals Booster', price: 49.00, duration: 7 });
+                          setShowSubModal(true);
+                        }}
+                      >
+                        Subscribe for ₹49
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Active Subscriptions List */}
+                  <div className="glass-panel" style={{ padding: '24px' }}>
+                    <h3 style={{ marginBottom: '15px' }}>Your Subscription History</h3>
+                    {publisherSubscriptions.length === 0 ? (
+                      <p style={{ color: '#9ca3af', fontSize: '13px', textAlign: 'center' }}>No subscription history recorded yet.</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {publisherSubscriptions.map(sub => (
+                          <div key={sub.id} className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: 'rgba(255,255,255,0.01)' }}>
+                            <div>
+                              <h4 style={{ fontSize: '14px', color: '#fff' }}>{sub.plan_name}</h4>
+                              <span style={{ fontSize: '11px', color: '#9ca3af' }}>UTR Code: {sub.utr_id} | Paid: ₹{parseFloat(sub.price).toFixed(2)} | Date: {new Date(sub.created_at).toLocaleDateString()}</span>
+                            </div>
+                            <span className={`badge badge-${sub.status}`}>{sub.status}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              )}
+
               {/* 10. DONATE TAB */}
               {activeTab === 'donate' && (
                 <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -1785,6 +1949,42 @@ export default function App() {
                   )}
                 </div>
 
+                {/* 2b. Subscriptions Approval Manager */}
+                <div className="glass-panel" style={{ padding: '24px' }}>
+                  <h3 style={{ marginBottom: '20px' }}>Subscriptions Verification Queue</h3>
+                  {allSubscriptions.filter(s => s.status === 'pending').length === 0 ? (
+                    <p style={{ color: '#9ca3af', fontSize: '14px', textAlign: 'center' }}>No pending subscription updates.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                      {allSubscriptions.filter(s => s.status === 'pending').map(sub => (
+                        <div key={sub.id} className="glass-card" style={{ padding: '16px', background: 'rgba(255,255,255,0.01)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+                            <div>
+                              <h4 style={{ fontSize: '16px', color: 'var(--accent-emerald)' }}>
+                                {sub.plan_name} (₹{parseFloat(sub.price).toFixed(2)})
+                              </h4>
+                              <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>Publisher: {sub.profiles?.email}</div>
+                              <div style={{ fontSize: '12px', background: '#0a0814', padding: '10px', borderRadius: '6px', marginTop: '8px', color: '#fff', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <b>UTR ID:</b> {sub.utr_id}
+                              </div>
+                            </div>
+                            <span className="badge badge-pending">{sub.status}</span>
+                          </div>
+                          
+                          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                            <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => handleRejectSubscription(sub.id)}>
+                              Reject
+                            </button>
+                            <button className="btn btn-emerald" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => handleApproveSubscription(sub.id)}>
+                              Approve & Activate
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
               </div>
 
               {/* Settings Panel */}
@@ -1971,6 +2171,82 @@ export default function App() {
         )}
 
       </main>
+
+      {/* CHECKOUT MODAL WITH QR CODE */}
+      {showSubModal && selectedSubPlan && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999, padding: '20px' }}>
+          <div className="glass-panel" style={{ padding: '30px', maxWidth: '480px', width: '100%', textAlign: 'center', position: 'relative', border: '1px solid rgba(16, 185, 129, 0.3)', backdropFilter: 'blur(10px)' }}>
+            
+            <button 
+              type="button" 
+              className="btn btn-secondary" 
+              style={{ position: 'absolute', top: '15px', right: '15px', padding: '6px 12px', fontSize: '12px' }}
+              onClick={() => setShowSubModal(false)}
+            >
+              Close
+            </button>
+
+            <h3 style={{ fontSize: '22px', marginBottom: '8px', color: '#fff' }}>Scan & Pay via UPI</h3>
+            <p style={{ color: '#9ca3af', fontSize: '13px', marginBottom: '15px' }}>
+              Subscribe to <strong>{selectedSubPlan.name}</strong> for <strong>₹{selectedSubPlan.price}</strong>
+            </p>
+
+            {/* QR Code Img */}
+            <img 
+              src="/upi_qr.png" 
+              alt="UPI QR Code" 
+              style={{ width: '220px', height: '220px', borderRadius: '12px', margin: '0 auto 15px', display: 'block', border: '4px solid #fff' }} 
+            />
+
+            <div style={{ fontSize: '13px', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '20px', textAlign: 'left' }}>
+              <div style={{ marginBottom: '4px' }}><strong>UPI ID:</strong> arasu9629hf@okhdfcbank</div>
+              <div><strong>Amount:</strong> ₹{selectedSubPlan.price} INR</div>
+            </div>
+
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!subUtrId || subUtrId.length < 8) {
+                alert("Please enter a valid 12-digit UTR Transaction ID.");
+                return;
+              }
+              try {
+                const { error } = await supabase.table('subscriptions').insert({
+                  publisher_id: user.id,
+                  plan_name: selectedSubPlan.name,
+                  price: selectedSubPlan.price,
+                  duration_days: selectedSubPlan.duration,
+                  utr_id: subUtrId,
+                  status: 'pending'
+                });
+                if (error) throw error;
+                alert("Subscription submitted successfully! Verification pending.");
+                setSubUtrId('');
+                setShowSubModal(false);
+                // Reload publisher data to update subs table
+                fetchPublisherData();
+              } catch (err) {
+                alert("Failed to submit subscription: " + err.message);
+              }
+            }}>
+              <div className="form-group" style={{ textAlign: 'left' }}>
+                <label className="form-label">Enter 12-digit UTR / UPI Transaction ID</label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  placeholder="e.g. 627192039281" 
+                  value={subUtrId} 
+                  onChange={e => setSubUtrId(e.target.value)} 
+                  required 
+                />
+              </div>
+
+              <button type="submit" className="btn btn-emerald" style={{ width: '100%', marginTop: '10px' }}>
+                Confirm Payment & Submit UTR
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer style={{ background: '#07050d', borderTop: '1px solid var(--border-color)', padding: '40px 20px', textAlign: 'center', fontSize: '13px', color: '#9ca3af', marginTop: '60px' }}>

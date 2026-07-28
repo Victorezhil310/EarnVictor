@@ -134,3 +134,30 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- 7. Subscriptions Table (Ads Free & Boosters)
+CREATE TABLE IF NOT EXISTS public.subscriptions (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    publisher_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    plan_name TEXT NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
+    duration_days INTEGER NOT NULL,
+    utr_id TEXT UNIQUE NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    activated_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Enable Row Level Security
+ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
+
+-- Policies for Subscriptions
+CREATE POLICY "Subscriptions viewable by publisher or owner"
+    ON public.subscriptions FOR SELECT USING (auth.uid() = publisher_id OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'owner'));
+
+CREATE POLICY "Subscriptions insertable by publisher"
+    ON public.subscriptions FOR INSERT WITH CHECK (auth.uid() = publisher_id);
+
+CREATE POLICY "Subscriptions update by owner only"
+    ON public.subscriptions FOR UPDATE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'owner'));
+
