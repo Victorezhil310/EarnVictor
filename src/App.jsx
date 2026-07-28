@@ -213,6 +213,24 @@ export default function App() {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    setAuthError('');
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin
+        }
+      });
+      if (error) throw error;
+    } catch (err) {
+      setAuthError(err.message || 'Google authentication failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -710,6 +728,28 @@ export default function App() {
                   {loading ? 'Authenticating...' : isSignUp ? 'Sign Up' : 'Sign In'}
                 </button>
               </form>
+
+              <div style={{ display: 'flex', alignItems: 'center', margin: '20px 0', color: 'var(--text-muted)' }}>
+                <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }}></div>
+                <span style={{ padding: '0 10px', fontSize: '11px', fontWeight: 600 }}>OR</span>
+                <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }}></div>
+              </div>
+
+              <button 
+                type="button" 
+                onClick={handleGoogleLogin} 
+                className="btn btn-secondary" 
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '12px' }}
+                disabled={loading}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" style={{ display: 'block' }}>
+                  <path fill="#EA4335" d="M12 5.04c1.76 0 3.32.61 4.56 1.79l3.4-3.4C17.9 1.54 15.17.92 12 .92 7.37.92 3.39 3.58 1.43 7.48l3.99 3.1A6.98 6.98 0 0 1 12 5.04z"/>
+                  <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.35H12v4.45h6.45c-.28 1.48-1.12 2.73-2.38 3.58l3.7 2.87c2.16-1.99 3.4-4.92 3.4-8.55z"/>
+                  <path fill="#FBBC05" d="M5.42 14.58a6.93 6.93 0 0 1 0-5.16l-3.99-3.1a11.95 11.95 0 0 0 0 11.36l3.99-3.1z"/>
+                  <path fill="#34A853" d="M12 23.08c3.24 0 5.97-1.07 7.96-2.91l-3.7-2.87c-1.03.69-2.35 1.1-4.26 1.1-3.28 0-6.07-2.22-7.06-5.2l-3.99 3.1c1.96 3.9 5.94 6.56 10.57 6.56z"/>
+                </svg>
+                Continue with Google
+              </button>
 
               <div style={{ marginTop: '24px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '20px' }}>
                 <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
