@@ -31,6 +31,7 @@ import {
   Info
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
+import { Analytics } from '@vercel/analytics/react';
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState('home'); // home, auth, dashboard, owner, owner-dashboard, legal-terms, legal-privacy, legal-dmca
@@ -1609,6 +1610,9 @@ export default function App() {
         )}
 
       </main>
+
+      {/* Vercel Analytics */}
+      <Analytics />
 
       {/* Footer */}
       <footer style={{ background: '#07050d', borderTop: '1px solid var(--border-color)', padding: '40px 20px', textAlign: 'center', fontSize: '13px', color: '#9ca3af', marginTop: '60px' }}>
